@@ -777,91 +777,101 @@ parseCSV(csvString) {
 	return results.data;
   }
   
-  /**
-   * Map CSV data to Monarch jobs format with proper field extraction
-   * @returns {Array} Array of job objects in Monarch format
-   */
-  mapOrdersToMonarch() {
-	return this.orderData.map((order, index) => {
-	  // Create a unique job ID using the invoice number or generate one
-	  let jobId = '';
-	  if (order['Invoice Number']) {
-		jobId = order['Invoice Number'].toString().padStart(8, '0').substring(0, 8);
-	  } else {
-		jobId = (`JOB${index+1}`).padStart(8, '0').substring(0, 8);
-	  }
-	  
-	  // Parse dates from order data
-	  const dueDate = order['Due date'] ? this.formatDate(order['Due date']) : '';
-	  const shipDate = order['Shipping date'] ? this.formatDate(order['Shipping date']) : '';
-	  
-	  // Map the PO number from custom field
-	  const poNumber = order['Custom Field 1-po#'] || '';
-	  
-	  // Get the customer ID from the customer data that matches this order
-	  console.log('customerData', this.customerData);
-	  console.log('order', order);
-	  const customerRecord = this.customerData.find(c => c['Customer ID'] === order['Customer Name']);
-	  const customerId = customerRecord ? customerRecord['Customer ID'] : '';
-	  
-	  // also find the Bill to Contact First Name and Bill to Contact Last Name
-	  const contactName = customerRecord ? `${customerRecord['Bill to Contact First Name']} ${customerRecord['Bill to Contact Last Name']}` : '';
-	  
-	  // Convert any numeric values to strings with proper formatting
-	  const qtyOrdered = order['Line: Quantity'] ? 
-		parseFloat(order['Line: Quantity']).toFixed(3).toString() : 
-		'';
-	  
-	  const unitPrice = order['Line: Unit price'] ? 
-		parseFloat(order['Line: Unit price']).toFixed(3).toString() : 
-		'0.00';
-	  
-	  const quotationAmount = order['Line: Amount'] ? 
-		parseFloat(order['Line: Amount']).toFixed(3).toString() : 
-		'0.00';
-	  
-	  // Use the product name directly - the CSV parser should have handled this properly
-	  const productName = order['Line: Product Name'] || '';
-	  
-	  // Ensure the description doesn't exceed field length
-	  const jobDescription = productName.substring(0, 254);
-	  const jobTitle = productName.substring(0, 50);
-	  
-	  // will use quotation amount later, just leave it
-
-	//   if the job_id is < 8 characters, pad it with leading spaces, so probably need to make it a strgin
-	// if (jobId.length < 8) {
-	// 	jobId = jobId.padStart(8, 'X');
-	// }
-	// also check however many 0s are at the front of it replace with Xs, just at the beginning of the string
-	jobId = jobId.replace(/^0+/, '');
-	  
-	  // Map order to Monarch job format according to exact specifications
-	  return {
-		'job_id': { value: jobId, pos: 1, len: 8 },
-		'sub_job_id': { value: '', pos: 9, len: 4 },
-		'job_description': { value: jobDescription, pos: 13, len: 254 },
-		'job_type': { value: 'FG', pos: 267, len: 19 }, // Default to Finished Goods
-		'item_id': { value: '', pos: 286, len: 15 },
-		'cust_ordered_by': { value: customerId.substring(0, 8), pos: 301, len: 8 },
-		'cust_billed_to': { value: customerId.substring(0, 8), pos: 309, len: 8 },
-		'sales_class_id': { value: '', pos: 317, len: 8 },
-		'po_number': { value: poNumber.substring(0, 20), pos: 325, len: 20 },
-		'date_promised': { value: dueDate, pos: 345, len: 10 },
-		'ship_date': { value: shipDate, pos: 355, len: 10 },
-		'qty_ordered': { value: qtyOrdered, pos: 365, len: 11 },
-		'priority': { value: '', pos: 376, len: 10 }, 
-		'contact_name': { value: contactName, pos: 386, len: 30 },
-		'expense_code': { value: '', pos: 416, len: 24 },
-		'shop_floor_active': { value: '0', pos: 440, len: 1 },
-		'form_number': { value: '', pos: 441, len: 20 },
-		'quotation_amount': { value: '', pos: 461, len: 15 },
-		'unit_of_measure_id': { value: 'EA', pos: 476, len: 4 }, // Default to Each
-		'unit_price': { value: unitPrice, pos: 480, len: 16 },
-		'job_title': { value: jobTitle, pos: 496, len: 50 },
-		'forest_type_id': { value: '', pos: 546, len: 15 },
-	  };
+		/**
+		 * Map CSV data to Monarch jobs format with proper field extraction
+		 * Groups jobs with the same invoice number and assigns consecutive line numbers
+		 * @returns {Array} Array of job objects in Monarch format
+		 */
+		mapOrdersToMonarch() {
+			// First, group orders by invoice number
+			const ordersByInvoice = {};
+			
+			this.orderData.forEach(order => {
+			const invoiceNumber = order['Invoice Number'] || '';
+			if (!ordersByInvoice[invoiceNumber]) {
+				ordersByInvoice[invoiceNumber] = [];
+			}
+			ordersByInvoice[invoiceNumber].push(order);
+			});
+			
+			// Process each group and create job records with consecutive line numbers
+			const jobs = [];
+			
+			Object.entries(ordersByInvoice).forEach(([invoiceNumber, orders]) => {
+			orders.forEach((order, index) => {
+				// Create a job ID from the invoice number
+				let jobId = '';
+				if (invoiceNumber) {
+				jobId = invoiceNumber.toString().padStart(8, '0').substring(0, 8);
+				} else {
+				// Generate a unique ID if invoice number is missing
+				jobId = (`JOB${jobs.length + 1}`).padStart(8, '0').substring(0, 8);
+				}
+				
+				// Clean up jobId by replacing leading zeros with spaces
+				jobId = jobId.replace(/^0+/, match => ' '.repeat(match.length));
+				
+				// Create sub-job ID (line number) - 1-based indexing
+				const subJobId = (index + 1).toString().padStart(4, ' ');
+				
+				// Parse dates from order data
+				const dueDate = order['Due date'] ? this.formatDate(new Date(order['Due date'])) : '';
+				const shipDate = order['Shipping date'] ? this.formatDate(new Date(order['Shipping date'])) : '';
+				
+				// Map the PO number from custom field
+				const poNumber = order['Custom Field 1-po#'] || '';
+				
+				// Get the customer data that matches this order
+				const customerRecord = this.customerData.find(c => c['Customer ID'] === order['Customer Name']);
+				const customerId = customerRecord ? customerRecord['Customer ID'] : '';
+				
+				// Contact name from customer record
+				const contactName = customerRecord ? 
+				`${customerRecord['Bill to Contact First Name'] || ''} ${customerRecord['Bill to Contact Last Name'] || ''}`.trim() : 
+				'';
+				
+				// Format numeric values
+				const qtyOrdered = order['Line: Quantity'] ? 
+				parseFloat(order['Line: Quantity']).toFixed(2).toString() : 
+				'0.00';
+				
+				const unitPrice = order['Line: Unit price'] ? 
+				parseFloat(order['Line: Unit price']).toFixed(2).toString() : 
+				'0.00';
+				
+				// Clean product description
+				const rawProductName = order['Line: Product Name'] || '';
+				const productName = this.cleanProductDescription(rawProductName);
+				
+				// Map order to Monarch job format
+				jobs.push({
+				'job_id': { value: jobId, pos: 1, len: 8 },
+				'sub_job_id': { value: subJobId, pos: 9, len: 4 },
+				'job_description': { value: productName.substring(0, 254), pos: 13, len: 254 },
+				'job_type': { value: 'FG', pos: 267, len: 19 }, // Default to Finished Goods
+				'item_id': { value: '', pos: 286, len: 15 },
+				'cust_ordered_by': { value: customerId.substring(0, 8), pos: 301, len: 8 },
+				'cust_billed_to': { value: customerId.substring(0, 8), pos: 309, len: 8 },
+				'sales_class_id': { value: '', pos: 317, len: 8 },
+				'po_number': { value: poNumber.substring(0, 20), pos: 325, len: 20 },
+				'date_promised': { value: dueDate, pos: 345, len: 10 },
+				'ship_date': { value: shipDate, pos: 355, len: 10 },
+				'qty_ordered': { value: qtyOrdered, pos: 365, len: 11 },
+				'priority': { value: '', pos: 376, len: 10 }, 
+				'contact_name': { value: contactName.substring(0, 30), pos: 386, len: 30 },
+				'expense_code': { value: '', pos: 416, len: 24 },
+				'shop_floor_active': { value: '1', pos: 440, len: 1 },
+				'form_number': { value: '', pos: 441, len: 20 },
+				'quotation_amount': { value: '', pos: 461, len: 15 },
+				'unit_of_measure_id': { value: 'EA', pos: 476, len: 4 }, // Default to Each
+				'unit_price': { value: unitPrice, pos: 480, len: 16 },
+				'job_title': { value: productName.substring(0, 50), pos: 496, len: 50 },
+				'forest_type_id': { value: '', pos: 546, len: 15 },
+				});
+		});
 	});
+	
+	return jobs;
   }
 	
 	/**
@@ -1681,40 +1691,40 @@ fileViewer.initialize();
 		}
 	};
 
-	// Modify the mapOrdersToMonarch method to use the cleanProductDescription function
-	const originalMapOrdersToMonarch = MonarchImporter.prototype.mapOrdersToMonarch;
-	MonarchImporter.prototype.mapOrdersToMonarch = function() {
-	// If the original doesn't exist yet, create a basic implementation
-	if (typeof originalMapOrdersToMonarch !== 'function') {
-		return this.orderData.map((order, index) => {
-		// All your existing code
+	// // Modify the mapOrdersToMonarch method to use the cleanProductDescription function
+	// const originalMapOrdersToMonarch = MonarchImporter.prototype.mapOrdersToMonarch;
+	// MonarchImporter.prototype.mapOrdersToMonarch = function() {
+	// // If the original doesn't exist yet, create a basic implementation
+	// if (typeof originalMapOrdersToMonarch !== 'function') {
+	// 	return this.orderData.map((order, index) => {
+	// 	// All your existing code
 		
-		// But use the cleaned product name:
-		const rawProductName = order['Line: Product Name'] || '';
-		const productName = this.cleanProductDescription(rawProductName);
+	// 	// But use the cleaned product name:
+	// 	const rawProductName = order['Line: Product Name'] || '';
+	// 	const productName = this.cleanProductDescription(rawProductName);
 		
-		return {
-			// All your fields with job_description and job_title using the clean product name
-			'job_description': { value: productName.substring(0, 254), pos: 13, len: 254 },
-			// etc.
-		};
-		});
-	}
+	// 	return {
+	// 		// All your fields with job_description and job_title using the clean product name
+	// 		'job_description': { value: productName.substring(0, 254), pos: 13, len: 254 },
+	// 		// etc.
+	// 	};
+	// 	});
+	// }
 	
-	// If the original exists, use it as a starting point
-	const jobs = originalMapOrdersToMonarch.call(this);
+	// // If the original exists, use it as a starting point
+	// const jobs = originalMapOrdersToMonarch.call(this);
 	
-	// Then modify each job to use the cleaned product name
-	return jobs.map(job => {
-		const order = this.orderData.find(o => o['Invoice Number'] === job.job_id.value.trim());
-		if (order && order['Line: Product Name']) {
-		const cleanName = this.cleanProductDescription(order['Line: Product Name']);
-		job.job_description.value = cleanName.substring(0, 254);
-		job.job_title.value = cleanName.substring(0, 50);
-		}
-		return job;
-	});
-	};
+	// // Then modify each job to use the cleaned product name
+	// return jobs.map(job => {
+	// 	const order = this.orderData.find(o => o['Invoice Number'] === job.job_id.value.trim());
+	// 	if (order && order['Line: Product Name']) {
+	// 	const cleanName = this.cleanProductDescription(order['Line: Product Name']);
+	// 	job.job_description.value = cleanName.substring(0, 254);
+	// 	job.job_title.value = cleanName.substring(0, 50);
+	// 	}
+	// 	return job;
+	// });
+	// };
 
 	// Simple file viewer integration
 	// This avoids complex method replacement
