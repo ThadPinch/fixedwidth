@@ -540,7 +540,9 @@ class MonarchFileViewer {
 		
 		// Calculate the exact position considering scroll position
 		const scrollLeft = viewerContent.scrollLeft || 0;
-		const x = event.clientX - viewerRect.left + scrollLeft;
+		// const x = event.clientX - viewerRect.left + scrollLeft;
+		// that is always saying 2 further than it should be
+		const x = event.clientX - viewerRect.left + scrollLeft - 13;
 		
 		// Calculate the position based on the monospace font width
 		const charWidth = 7.8; // Approximate width of monospace character
