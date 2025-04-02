@@ -19,6 +19,45 @@ body {
 	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   }
   
+  /* Tab styling */
+  .tabs {
+	display: flex;
+	border-bottom: 1px solid #dee2e6;
+	margin-bottom: 20px;
+  }
+  
+  .tab-btn {
+	background-color: transparent;
+	border: 1px solid transparent;
+	padding: 10px 15px;
+	margin-bottom: -1px;
+	border-top-left-radius: 4px;
+	border-top-right-radius: 4px;
+	color: #0d6efd;
+	cursor: pointer;
+	font-weight: 500;
+  }
+  
+  .tab-btn:hover {
+	border-color: #e9ecef #e9ecef #dee2e6;
+	background-color: #f8f9fa;
+  }
+  
+  .tab-btn.active {
+	color: #495057;
+	background-color: #fff;
+	border-color: #dee2e6 #dee2e6 #fff;
+  }
+  
+  .tab-content {
+	display: none;
+	padding: 15px 0;
+  }
+  
+  .tab-content.active {
+	display: block;
+  }
+  
   .file-upload {
 	margin-bottom: 20px;
   }
@@ -78,6 +117,7 @@ body {
 	cursor: pointer;
 	font-size: 16px;
 	transition: background-color 0.3s;
+	margin-bottom: 20px;
   }
   
   button:hover {
@@ -155,169 +195,50 @@ body {
   .error {
 	color: #dc3545;
   }
-
-  /*put all this in here	/**
-	 * Add CSS styles for the file viewer
-	 */
-	/* addStyles() {
-		const styleSheet = document.createElement('style');
-		styleSheet.type = 'text/css';
-		styleSheet.textContent = `
-		  .file-viewer-container {
-			margin-top: 30px;
-			padding: 20px;
-			background-color: #f8f9fa;
-			border-radius: 5px;
-			border: 1px solid #ddd;
-		  }
-		  
-		  .file-viewer-container h2 {
-			margin-top: 0;
-			color: #2c3e50;
-		  }
-		  
-		  .file-selector {
-			margin-bottom: 15px;
-			display: flex;
-			gap: 15px;
-			align-items: center;
-		  }
-		  
-		  .viewer-btn {
-			background-color: #0d6efd;
-			color: white;
-			border: none;
-			padding: 8px 15px;
-			border-radius: 4px;
-			cursor: pointer;
-		  }
-		  
-		  .viewer-btn:hover {
-			background-color: #0b5ed7;
-		  }
-		  
-		  .position-display {
-			font-family: monospace;
-			background-color: #f0f0f0;
-			padding: 5px 10px;
-			border-radius: 3px;
-			margin-left: auto;
-		  }
-		  
-		  .viewer-content {
-			font-family: monospace;
-			white-space: pre;
-			overflow-x: auto;
-			background-color: white;
-			border: 1px solid #ddd;
-			padding: 10px;
-			margin-bottom: 15px;
-			line-height: 1.5;
-			min-height: 200px;
-			max-height: 400px;
-			overflow-y: auto;
-		  }
-		  
-		  .field-key {
-			display: flex;
-			flex-wrap: wrap;
-			gap: 10px;
-			background-color: white;
-			border: 1px solid #ddd;
-			padding: 10px;
-		  }
-		  
-		  .field-item {
-			display: flex;
-			align-items: center;
-			margin-right: 10px;
-			margin-bottom: 5px;
-		  }
-		  
-		  .color-box {
-			width: 15px;
-			height: 15px;
-			margin-right: 5px;
-			border: 1px solid #ddd;
-		  }
-		  
-		  .field-name {
-			font-size: 12px;
-		  }
-		  
-		  .field-pos {
-			font-size: 10px;
-			color: #666;
-			margin-left: 3px;
-		  }
-		  
-		  .highlight {
-			padding: 1px 0;
-		  }
-		  
-		  .line-number {
-			display: inline-block;
-			width: 30px;
-			text-align: right;
-			margin-right: 10px;
-			color: #888;
-			user-select: none;
-		  }
-		  
-		  .position-marker {
-			position: absolute;
-			top: -16px;
-			font-size: 9px;
-			color: #999;
-		  }
-		`;
-		
-		document.head.appendChild(styleSheet);
-
-		*/
-
-.file-viewer-container {
+  
+  /* File Viewer Styles */
+  .file-viewer-container {
 	margin-top: 30px;
 	padding: 20px;
 	background-color: #f8f9fa;
 	border-radius: 5px;
 	border: 1px solid #ddd;
-}
-
-.file-viewer-container h2 {
+  }
+  
+  .file-viewer-container h2 {
 	margin-top: 0;
 	color: #2c3e50;
-}
-
-.file-selector {
+  }
+  
+  .file-selector {
 	margin-bottom: 15px;
 	display: flex;
 	gap: 15px;
 	align-items: center;
-}
-
-.viewer-btn {
+  }
+  
+  .viewer-btn {
 	background-color: #0d6efd;
 	color: white;
 	border: none;
 	padding: 8px 15px;
 	border-radius: 4px;
 	cursor: pointer;
-}
-
-.viewer-btn:hover {
+  }
+  
+  .viewer-btn:hover {
 	background-color: #0b5ed7;
-}
-
-.position-display {
+  }
+  
+  .position-display {
 	font-family: monospace;
 	background-color: #f0f0f0;
 	padding: 5px 10px;
 	border-radius: 3px;
 	margin-left: auto;
-}
-
-.viewer-content {
+  }
+  
+  .viewer-content {
 	font-family: monospace;
 	white-space: pre;
 	overflow-x: auto;
@@ -329,25 +250,25 @@ body {
 	min-height: 200px;
 	max-height: 400px;
 	overflow-y: auto;
-}
-
-.field-key {
+  }
+  
+  .field-key {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 10px;
 	background-color: white;
 	border: 1px solid #ddd;
 	padding: 10px;
-}
-
-.field-item {
+  }
+  
+  .field-item {
 	display: flex;
 	align-items: center;
 	margin-right: 10px;
 	margin-bottom: 5px;
-}
-
-.color-box {
+  }
+  
+  .color-box {
 	width: 15px;
 	height: 15px;
 	margin-right: 5px;
@@ -376,11 +297,10 @@ body {
 	color: #888;
 	user-select: none;
   }
-
+  
   .position-marker {
 	position: absolute;
 	top: -16px;
 	font-size: 9px;
 	color: #999;
   }
-  

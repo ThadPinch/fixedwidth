@@ -1,4 +1,304 @@
 /**
+ * Customer Import specific class for handling the standalone customer list import
+ */
+class CustomerListImporter {
+	constructor() {
+	  this.customerListData = [];
+	}
+	
+	/**
+	 * Parse a CSV or Excel file containing customer data
+	 * @param {File} file - The customer list file (CSV or Excel)
+	 * @returns {Promise} Promise resolving to the parsed data
+	 */
+	parseCustomerListFile(file) {
+	  return new Promise((resolve, reject) => {
+		if (file.name.endsWith('.csv')) {
+		  this.parseCSVFile(file).then(resolve).catch(reject);
+		} else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+		  this.parseExcelFile(file).then(resolve).catch(reject);
+		} else {
+		  reject(new Error('Unsupported file format. Please upload a CSV or Excel file.'));
+		}
+	  });
+	}
+	
+	/**
+	 * Parse a CSV file
+	 * @param {File} file - The CSV file to parse
+	 * @returns {Promise} Promise resolving to the parsed data
+	 */
+	parseCSVFile(file) {
+	  return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		
+		reader.onload = (event) => {
+		  try {
+			const csvData = event.target.result;
+			
+			Papa.parse(csvData, {
+			  header: true,
+			  dynamicTyping: true,
+			  skipEmptyLines: true,
+			  complete: (results) => {
+				this.customerListData = results.data;
+				resolve(results.data);
+			  },
+			  error: (error) => {
+				reject(error);
+			  }
+			});
+		  } catch (error) {
+			reject(error);
+		  }
+		};
+		
+		reader.onerror = (error) => {
+		  reject(error);
+		};
+		
+		reader.readAsText(file);
+	  });
+	}
+	
+	/**
+	 * Parse an Excel file
+	 * @param {File} file - The Excel file to parse
+	 * @returns {Promise} Promise resolving to the parsed data
+	 */
+	parseExcelFile(file) {
+	  return new Promise((resolve, reject) => {
+		// This would require xlsx.js or another Excel parsing library
+		// For now, we'll just show an example implementation
+		reject(new Error('Excel parsing not implemented. Please use CSV format instead.'));
+	  });
+	}
+	
+	/**
+	 * Map customer list data to Monarch format
+	 * @returns {Array} Array of customer objects in Monarch format
+	 */
+	mapCustomerListToMonarch() {
+	  return this.customerListData.map(customer => {
+		// Extract customer data with fallbacks to empty strings
+		const custCode = (customer.accountName || customer.customerID || '').toString().substring(0, 8);
+		const custName = (customer.accountName || '').toString().substring(0, 40);
+		
+		// Address information
+		const address1 = (customer.btStreet || '').toString().substring(0, 40);
+		const address2 = (customer.btAddress2 || '').toString().substring(0, 40);
+		const address3 = (customer.btAddress3 || '').toString().substring(0, 40);
+		const city = (customer.btCity || '').toString().substring(0, 40);
+		const state = (customer.btState || '').toString().substring(0, 3);
+		const zip = (customer.btZip || '').toString().substring(0, 10);
+		const country = (customer.btCountry || 'USA').toString().substring(0, 40);
+		
+		// Contact information
+		const phone = (customer.btTelephone || '').toString().substring(0, 20);
+		const fax = (customer.btFax || '').toString().substring(0, 20);
+		
+		// Generate email from available fields
+		let email = '';
+		if (customer.billContactUserID) {
+		  // If there's a billContactUserID, we might use that to find an email
+		  // This is a placeholder - in a real implementation, you would look up the email
+		  email = '';
+		}
+		
+		// Financial and business information
+		const arTaxCode = (customer.taxItem || '').toString().substring(0, 10);
+		const termsCode = (customer.btTerms || '').toString().substring(0, 20);
+		const salesAgentId = (customer.salesmanID || '000000000').toString().substring(0, 8);
+		const csrId = (customer.csrID || '000').toString().substring(0, 3);
+		
+		// Determine PO Required based on available data
+		const poRequired = customer.requirePO === 'Y' ? '1' : '0';
+		
+		// Create Monarch fixed-width format mapping
+		return {
+		  'Cust-code': { value: custCode, pos: 1, len: 8 },
+		  'Cust-name': { value: custName, pos: 9, len: 40 },
+		  
+		  // Address information
+		  'Address-1': { value: address1, pos: 49, len: 40 },
+		  'Address-2': { value: address2, pos: 89, len: 40 },
+		  'Address-3': { value: address3, pos: 129, len: 40 },
+		  'City': { value: city, pos: 169, len: 40 },
+		  'State': { value: state, pos: 209, len: 3 },
+		  'Zip': { value: zip, pos: 212, len: 10 },
+		  'Country': { value: country, pos: 222, len: 40 },
+		  
+		  // Contact information
+		  'Phone': { value: phone, pos: 262, len: 20 },
+		  'FAX': { value: fax, pos: 282, len: 20 },
+		  'E-Mail-Address': { value: email, pos: 302, len: 80 },
+		  
+		  // Business information
+		  'AR-Tax-Code': { value: arTaxCode, pos: 382, len: 10 },
+		  'Terms-Code': { value: termsCode, pos: 392, len: 20 },
+		  'Sales-agent-id': { value: salesAgentId, pos: 412, len: 8 },
+		  'CSR-ID': { value: csrId, pos: 420, len: 3 },
+		  'territory-id': { value: '', pos: 423, len: 12 },
+		  'Cust-ID-Bill-to': { value: '', pos: 435, len: 8 },
+		  'Group-ID': { value: '', pos: 443, len: 12 },
+		  'Priority': { value: 'Normal', pos: 455, len: 10 },
+		  'Estimate-Markup-Pct': { value: '', pos: 465, len: 6 },
+		  'Overs-Allowed': { value: '', pos: 471, len: 5 },
+		  'Date-First-Order': { value: this.formatDate(new Date()), pos: 476, len: 10 },
+		  'PO-Required': { value: poRequired, pos: 486, len: 1 },
+		  'AR-Stmt': { value: '1', pos: 487, len: 1 },
+		  'AR-Stmt-Dunning-Msg': { value: '0', pos: 488, len: 1 },
+		  
+		  // Inter-company settings
+		  'Inter-company': { value: '0', pos: 489, len: 1 },
+		  'System-ID-Inter-company': { value: '', pos: 490, len: 12 },
+		  
+		  // Banking and financial information
+		  'Bank': { value: '', pos: 502, len: 20 },
+		  'Bank-acct-num': { value: '', pos: 522, len: 20 },
+		  'Sales-tax-exempt': { value: customer.taxExemptionCertificate ? '1' : '0', pos: 542, len: 20 },
+		  'Credit-Limit': { value: '0', pos: 562, len: 14 },
+		  
+		  // Shipping information
+		  'Shipment-Method-ID': { value: customer.shipMethod ? customer.shipMethod.toString().substring(0, 8) : '', pos: 576, len: 8 },
+		  'Tax-Number': { value: customer.taxExemptionCertificate || '', pos: 584, len: 20 },
+		  'Addl-Tax-Number': { value: '', pos: 604, len: 20 },
+		  'Industry-Code': { value: customer.accountType ? customer.accountType.toString().substring(0, 8) : '', pos: 624, len: 8 },
+		  
+		  // Locale and system settings
+		  'Locale-ID': { value: 'en_US', pos: 632, len: 6 },
+		  'Prograph-Customer-Type': { value: '0', pos: 638, len: 1 },
+		  'Prograph-Shipper': { value: '0', pos: 639, len: 1 },
+		  'Prograph-Paper-Owner': { value: '0', pos: 640, len: 1 },
+		  'Prograph-Advertiser': { value: '0', pos: 641, len: 1 },
+		  'Prograph-Advertising-Agency': { value: '0', pos: 642, len: 1 },
+		  
+		  // Web access flags
+		  'Allow-PSF-Access': { value: '0', pos: 643, len: 1 },
+		  'PSF-Auto-Accept-Orders': { value: '0', pos: 644, len: 1 },
+		  'PrinterSite-Exchange': { value: '0', pos: 645, len: 1 },
+		  'Available-in-PrintStream': { value: '0', pos: 646, len: 1 },
+		  
+		  // PrinterSite settings
+		  'PS-Fulfillment': { value: '', pos: 647, len: 8 },
+		  'PS-Franchise-Number': { value: '', pos: 655, len: 30 },
+		  'PS-Store-Number': { value: '', pos: 685, len: 30 },
+		  'PS-Credit-Hold': { value: '0', pos: 715, len: 1 },
+		  
+		  // Finance and AR settings
+		  'AR-Stmt-Finance-Chrg': { value: '0', pos: 716, len: 1 },
+		  'Allow-OPS': { value: '0', pos: 717, len: 1 },
+		  'iQuote-Customer-ID': { value: '', pos: 718, len: 15 },
+		  
+		  // Document delivery options
+		  'ARStatementDelivery': { value: 'Printer', pos: 733, len: 7 },
+		  'BatchCloseInvDelivery': { value: 'Printer', pos: 740, len: 7 },
+		  'PointOfTitleTransfer': { value: 'Origin', pos: 747, len: 11 }
+		};
+	  });
+	}
+	
+	/**
+	 * Generate fixed-width customer import file
+	 * @returns {string} Fixed-width text file content
+	 */
+	generateCustomerImportFile() {
+	  const customers = this.mapCustomerListToMonarch();
+	  let result = '';
+	  
+	  customers.forEach(customer => {
+		// Create a line of spaces with the exact length required (758 characters)
+		const line = new Array(758).fill(' ');
+		
+		// Place each field at its proper position
+		for (const [field, def] of Object.entries(customer)) {
+		  if (def.value !== undefined) {
+			const value = def.value.toString();
+			const pos = def.pos - 1; // Convert to 0-based index
+			const len = def.len;
+			
+			// Place the value in the line array, truncating if necessary
+			for (let i = 0; i < Math.min(len, value.length); i++) {
+			  if (pos + i < line.length) {
+				line[pos + i] = value[i];
+			  }
+			}
+		  }
+		}
+		
+		// Add the line to the result
+		result += line.join('') + '\n';
+	  });
+	  
+	  return result;
+	}
+	
+	/**
+	 * Format a date to MM/DD/YYYY format
+	 * @param {Date} date - Date object
+	 * @returns {string} Formatted date string
+	 */
+	formatDate(date) {
+	  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+	  const day = date.getDate().toString().padStart(2, '0');
+	  const year = date.getFullYear();
+	  return `${month}/${day}/${year}`;
+	}
+	
+	/**
+	 * Download generated file
+	 * @param {string} content - Text content
+	 * @param {string} filename - Name to save file as
+	 */
+	downloadTextFile(content, filename) {
+	  const blob = new Blob([content], { type: 'text/plain' });
+	  const url = URL.createObjectURL(blob);
+	  
+	  const a = document.createElement('a');
+	  a.href = url;
+	  a.download = filename;
+	  document.body.appendChild(a);
+	  a.click();
+	  
+	  // Clean up
+	  setTimeout(() => {
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+	  }, 0);
+	}
+	
+	/**
+	 * Process customer list file and generate Monarch import file
+	 * @param {File} file - Customer list file
+	 * @returns {Promise} Promise resolving to result object
+	 */
+	async processFile(file) {
+	  try {
+		// Parse the file
+		await this.parseCustomerListFile(file);
+		
+		// Generate and download import file
+		const customerImport = this.generateCustomerImportFile();
+		this.downloadTextFile(customerImport, 'monarch_customer_import.txt');
+		
+		// Store in localStorage for the viewer
+		localStorage.setItem('monarch_customer_import', customerImport);
+		
+		return {
+		  success: true,
+		  message: 'Customer import file generated successfully!'
+		};
+	  } catch (error) {
+		console.error('Error processing customer list:', error);
+		return {
+		  success: false,
+		  message: `Error processing customer list: ${error.message}`
+		};
+	  }
+	}
+  }
+
+/**
  * Monarch File Viewer
  * 
  * A standalone component that can be added to display and validate 
@@ -152,69 +452,81 @@ class MonarchFileViewer {
 	 * Display the file content with highlighting
 	 */
 	displayFile() {
-	  if (!this.currentFileContent || !this.currentFileType) {
-		document.getElementById('viewer-content').innerHTML = 
-		  '<div class="empty-message">No file loaded. Generate files first or select a file type.</div>';
-		document.getElementById('field-key').innerHTML = '';
-		return;
-	  }
-	  
-	  const viewerContent = document.getElementById('viewer-content');
-	  const fieldKey = document.getElementById('field-key');
-	  const fields = this.fieldDefinitions[this.currentFileType];
-	  
-	  // Split the file content into lines
-	  const lines = this.currentFileContent.split('\n');
-	  
-	  let html = '';
-	  
-	  lines.forEach((line, lineIndex) => {
-		if (!line.trim()) return;
-		
-		// Add line number
-		html += `<div class="line"><span class="line-number">${lineIndex + 1}</span>`;
-		
-		// Process the line character by character
-		for (let i = 0; i < line.length; i++) {
-		  const charPos = i + 1; // 1-based position
-		  const char = line[i] === ' ' ? '&nbsp;' : line[i];
-		  
-		  // Find if this character belongs to a field
-		  let field = fields.find(f => charPos >= f.pos && charPos < f.pos + f.len);
-		  
-		  // Add position markers at intervals of 10
-		  const posMarker = (charPos % 10 === 0) ? 
-			`<span class="position-marker" style="left:${(i * 7.8) + 40}px">${charPos}</span>` : '';
-		  
-		  if (field) {
-			html += `${posMarker}<span class="highlight" style="background-color: ${field.color}">${char}</span>`;
-		  } else {
-			html += `${posMarker}${char}`;
+		if (!this.currentFileContent || !this.currentFileType) {
+			document.getElementById('viewer-content').innerHTML = 
+			  '<div class="empty-message">No file loaded. Generate files first or select a file type.</div>';
+			document.getElementById('field-key').innerHTML = '';
+			return;
 		  }
-		}
-		
-		html += '</div>';
-	  });
-	  
-	  // Display the highlighted content
-	  viewerContent.innerHTML = html;
-	  
-	  // Add the field key
-	  let keyHtml = '';
-	  fields.forEach(field => {
-		keyHtml += `
-		  <div class="field-item">
-			<div class="color-box" style="background-color: ${field.color}"></div>
-			<span class="field-name">${field.name}</span>
-			<span class="field-pos">(${field.pos}-${field.pos + field.len - 1})</span>
-		  </div>
-		`;
-	  });
-	  
-	  fieldKey.innerHTML = keyHtml;
-	  
-	  // Set up mousemove to show current position
-	  viewerContent.addEventListener('mousemove', this.trackMousePosition.bind(this));
+		  
+		  const viewerContent = document.getElementById('viewer-content');
+		  const fieldKey = document.getElementById('field-key');
+		  const fields = this.fieldDefinitions[this.currentFileType];
+		  
+		  // Split the file content into lines
+		  const lines = this.currentFileContent.split('\n');
+		  
+		  let html = '<div class="content-wrapper" style="position: relative;">';
+		  
+		  // Add position rulers at the top
+		  html += '<div class="position-ruler" style="height: 20px; margin-left: 40px; position: relative; margin-bottom: 5px;">';
+		  for (let i = 0; i <= 700; i += 10) {
+			html += `<span style="position: absolute; left: ${i * 7.8}px; top: 0; font-size: 9px; color: #999;">${i}</span>`;
+			if (i > 0) {
+			  html += `<span style="position: absolute; left: ${i * 7.8}px; top: 10px; height: 5px; border-left: 1px solid #ddd;"></span>`;
+			}
+		  }
+		  html += '</div>';
+		  
+		  lines.forEach((line, lineIndex) => {
+			if (!line.trim()) return;
+			
+			// Add line number
+			html += `<div class="line"><span class="line-number">${lineIndex + 1}</span>`;
+			
+			// Process the line character by character
+			for (let i = 0; i < line.length; i++) {
+			  const charPos = i + 1; // 1-based position
+			  const char = line[i] === ' ' ? '&nbsp;' : line[i];
+			  
+			  // Find if this character belongs to a field
+			  let field = fields.find(f => charPos >= f.pos && charPos < f.pos + f.len);
+			  
+			  if (field) {
+				html += `<span class="highlight" style="background-color: ${field.color}" title="${field.name} (${charPos})">${char}</span>`;
+			  } else {
+				html += char;
+			  }
+			}
+			
+			html += '</div>';
+		  });
+		  
+		  html += '</div>';
+		  
+		  // Display the highlighted content
+		  viewerContent.innerHTML = html;
+		  
+		  // Add the field key with sorting
+		  let keyHtml = '';
+		  
+		  // Sort fields by position
+		  const sortedFields = [...fields].sort((a, b) => a.pos - b.pos);
+		  
+		  sortedFields.forEach(field => {
+			keyHtml += `
+			  <div class="field-item">
+				<div class="color-box" style="background-color: ${field.color}"></div>
+				<span class="field-name">${field.name}</span>
+				<span class="field-pos">(${field.pos}-${field.pos + field.len - 1})</span>
+			  </div>
+			`;
+		  });
+		  
+		  fieldKey.innerHTML = keyHtml;
+		  
+		  // Set up mousemove to show current position
+		  viewerContent.addEventListener('mousemove', this.trackMousePosition.bind(this));
 	}
   
 	/**
@@ -222,19 +534,35 @@ class MonarchFileViewer {
 	 * @param {MouseEvent} event - Mouse event
 	 */
 	trackMousePosition(event) {
-	  const element = event.target;
-	  const rect = element.getBoundingClientRect();
-	  const x = event.clientX - rect.left;
-	  
-	  // Calculate the position based on the monospace font width
-	  // Adjust the character width and offset as needed
-	  const charWidth = 7.8; // Approximate width of monospace character
-	  const lineNumOffset = 40; // Width of line number area
-	  
-	  let position = Math.floor((x - lineNumOffset) / charWidth) + 1;
-	  position = Math.max(1, position);
-	  
-	  document.getElementById('current-position').textContent = position;
+		// We need to get the position relative to the content area
+		const viewerContent = document.getElementById('viewer-content');
+		const viewerRect = viewerContent.getBoundingClientRect();
+		
+		// Calculate the exact position considering scroll position
+		const scrollLeft = viewerContent.scrollLeft || 0;
+		const x = event.clientX - viewerRect.left + scrollLeft;
+		
+		// Calculate the position based on the monospace font width
+		const charWidth = 7.8; // Approximate width of monospace character
+		const lineNumOffset = 40; // Width of line number area
+		
+		let position = Math.floor((x - lineNumOffset) / charWidth) + 1;
+		position = Math.max(1, position);
+		
+		// Update the position display
+		document.getElementById('current-position').textContent = position;
+		
+		// Find which field this position belongs to
+		if (this.currentFileType) {
+			const fields = this.fieldDefinitions[this.currentFileType];
+			const field = fields.find(f => position >= f.pos && position < f.pos + f.len);
+			
+			// Update the display with field information if found
+			if (field) {
+				document.getElementById('current-position').textContent = 
+					`${position} (${field.name}: ${position - field.pos + 1}/${field.len})`;
+			}
+		}
 	}
   
 	/**
@@ -261,19 +589,22 @@ class MonarchFileViewer {
 	 * @returns {string} Sample file content
 	 */
 	getSampleData(fileType) {
-		if (fileType === 'customer') {
-		// Sample data with the correct field positions as per the requirements
-		return `Sendoso  Sendoso                                447 Battery St Ste 200                                                          San Francisco                        CA94111-3235  USA                                       (415) 555-1212                    info@sendoso.com                                                                              NET30     00000000000                                      04/02/2025000N0                                                                                                                                                                   en_US 000000000000000000000                                                                    000               PrinterPrinterOrigin     
-	Postal   Postal.io Inc                          75 Higuera St Ste 240                                                           San Luis Obispo                     CA93401-5425  USA                                       (805) 555-2020                    contact@postal.io                                                                              NET30     00000000000                                      04/02/2025000N0                                                                                                                                                                   en_US 000000000000000000000                                                                    000               PrinterPrinterOrigin     
-	HIGHGRAD HIGH GRADE USA                        2430 E University Dr.                                                           Phoenix                             AZ85034       USA                                       (847) 208-4198                    allie@highgradeusa.com                                                                          NET30     00000000000                                      04/02/2025000N0                                                                                                                                                                   en_US 000000000000000000000                                                                    000               PrinterPrinterOrigin     `;
-		} else {
-		// Keep the existing job sample data
-		return `00058520    Wide Format Vinyl : Autodesk Poster                                                                                                                                                                                                                           FG                                Sendoso Sendoso                             01/26/202512/27/20242.00       2                                                               1                    44.00          EA  22.00           Wide Format Vinyl : Autodesk Poster                              
-	00058520    Shipping                                                                                                                                                                                                                                                      FG                                Sendoso Sendoso                             01/26/202512/27/20240.00       2                                                               1                    45.00          EA  45.00           Shipping                                                         
-	00058531    Booklet - 6.5 square                                                                                                                                                                                                                                         FG                                Postal  Postal                                                   1.00       2                                                               1                    20.00          EA  0.00            Booklet - 6.5 square                                             
-	00058700    Die Creation : 7.4 x 1.94 - perf seal                                                                                                                                                                                                                         FG                                HIGHGRADHIGHGRAD                            01/26/202512/27/20241.00       2                                                               1                    174.00         EA  174.00          Die Creation : 7.4 x 1.94 - perf seal                            
-	00058700    Shipping                                                                                                                                                                                                                                                      FG                                HIGHGRADHIGHGRAD                            01/26/202512/27/20240.00       2                                                               1                    0.00           EA  0.00            Shipping                                                         `;
-		}
+	// 	if (fileType === 'customer') {
+	// 	// Sample data with the correct field positions as per the requirements
+	// 	return `Sendoso  Sendoso                                447 Battery St Ste 200                                                          San Francisco                        CA94111-3235  USA                                       (415) 555-1212                    info@sendoso.com                                                                              NET30     00000000000                                      04/02/2025000N0                                                                                                                                                                   en_US 000000000000000000000                                                                    000               PrinterPrinterOrigin     
+	// Postal   Postal.io Inc                          75 Higuera St Ste 240                                                           San Luis Obispo                     CA93401-5425  USA                                       (805) 555-2020                    contact@postal.io                                                                              NET30     00000000000                                      04/02/2025000N0                                                                                                                                                                   en_US 000000000000000000000                                                                    000               PrinterPrinterOrigin     
+	// HIGHGRAD HIGH GRADE USA                        2430 E University Dr.                                                           Phoenix                             AZ85034       USA                                       (847) 208-4198                    allie@highgradeusa.com                                                                          NET30     00000000000                                      04/02/2025000N0                                                                                                                                                                   en_US 000000000000000000000                                                                    000               PrinterPrinterOrigin     `;
+	// 	} else {
+	// 	// Keep the existing job sample data
+	// 	return `00058520    Wide Format Vinyl : Autodesk Poster                                                                                                                                                                                                                           FG                                Sendoso Sendoso                             01/26/202512/27/20242.00       2                                                               1                    44.00          EA  22.00           Wide Format Vinyl : Autodesk Poster                              
+	// 00058520    Shipping                                                                                                                                                                                                                                                      FG                                Sendoso Sendoso                             01/26/202512/27/20240.00       2                                                               1                    45.00          EA  45.00           Shipping                                                         
+	// 00058531    Booklet - 6.5 square                                                                                                                                                                                                                                         FG                                Postal  Postal                                                   1.00       2                                                               1                    20.00          EA  0.00            Booklet - 6.5 square                                             
+	// 00058700    Die Creation : 7.4 x 1.94 - perf seal                                                                                                                                                                                                                         FG                                HIGHGRADHIGHGRAD                            01/26/202512/27/20241.00       2                                                               1                    174.00         EA  174.00          Die Creation : 7.4 x 1.94 - perf seal                            
+	// 00058700    Shipping                                                                                                                                                                                                                                                      FG                                HIGHGRADHIGHGRAD                            01/26/202512/27/20240.00       2                                                               1                    0.00           EA  0.00            Shipping                                                         `;
+	// 	}
+
+		// just return no data
+		return '';
 	}
   }
 
@@ -724,174 +1055,6 @@ formatDate(date) {
 	  return `${month}/${day}/${year}`;
 	}
   }
-	// /**
-	//  * Map CSV data to Monarch customer format
-	//  * @returns {Array} Array of customer objects in Monarch format
-	//  */
-	// mapCustomersToMonarch() {
-	//   return this.customerData.map(customer => {
-	// 	// Create a properly structured customer object with all fields in correct positions
-	// 	const monarchCustomer = {
-	// 	  // Fields based on visible positions in Image 1 and common customer fields
-	// 	  // Start with key identifiers - positions estimated based on typical implementations
-	// 	  'customer_id': { value: customer['Customer ID'] || '', pos: 1, len: 20 },
-	// 	  'mis_account_id': { value: customer['MIS Account ID'] || '', pos: 21, len: 20 },
-	// 	  'customer_name': { value: customer['Customer Name'] || '', pos: 41, len: 40 },
-	// 	  'address_line1': { value: customer['Bill to Address-Line One'] || '', pos: 81, len: 40 },
-	// 	  'address_line2': { value: customer['Bill to Address-Line Two'] || '', pos: 121, len: 40 },
-	// 	  'city': { value: customer['Bill to City'] || '', pos: 161, len: 30 },
-	// 	  'state': { value: customer['Bill to State'] || '', pos: 191, len: 2 },
-	// 	  'zip': { value: customer['Bill to Zip'] || '', pos: 193, len: 10 },
-	// 	  'country': { value: customer['Bill to Country'] || '', pos: 203, len: 35 },
-	// 	  'contact_first_name': { value: customer['Bill to Contact First Name'] || '', pos: 238, len: 30 },
-	// 	  'contact_last_name': { value: customer['Bill to Contact Last Name'] || '', pos: 268, len: 30 },
-	// 	  'phone': { value: customer['Telephone 1'] || '', pos: 298, len: 20 },
-	// 	  'fax': { value: customer['Fax Number'] || '', pos: 318, len: 20 },
-	// 	  'email': { value: customer['Customer E-mail'] || '', pos: 338, len: 100 },
-	// 	  'sales_rep_id': { value: customer['Sales Representative ID'] || '', pos: 438, len: 8 },
-	// 	  'csr_id': { value: customer['CSR ID'] || '', pos: 446, len: 8 },
-	// 	  'terms_type': { value: customer['Terms Type'] || '', pos: 454, len: 10 },
-	// 	  'customer_type': { value: customer['Customer Type'] || '', pos: 464, len: 15 },
-		  
-	// 	  // Fields from positions 489+ which are clearly visible in the specifications
-	// 	  'inter_company_flag': { value: '0', pos: 489, len: 1 }, // Default to 0 (No)
-	// 	  'system_id_inter_company': { value: '', pos: 490, len: 12 },
-	// 	  'bank_name': { value: '', pos: 502, len: 20 },
-	// 	  'bank_acct_num': { value: '', pos: 522, len: 20 },
-	// 	  'sales_tax_exempt': { value: customer['Bill to Sales Tax ID'] ? 'Y' : 'N', pos: 542, len: 20 },
-	// 	  'credit_limit': { value: customer['Credit Limit'] || '', pos: 562, len: 14 },
-	// 	  'shipment_method_id': { value: customer['Ship Via'] ? customer['Ship Via'].substring(0, 8) : '', pos: 576, len: 8 },
-	// 	  'tax_number': { value: customer['Bill to Sales Tax ID'] || '', pos: 584, len: 20 },
-	// 	  'addl_tax_number': { value: '', pos: 604, len: 20 },
-	// 	  'industry_code': { value: customer['Customer Type'] ? customer['Customer Type'].substring(0, 8) : '', pos: 624, len: 8 },
-	// 	  'locale_id': { value: 'en_US', pos: 632, len: 6 },
-	// 	  'prograph_customer_type': { value: '0', pos: 638, len: 1 },
-	// 	  'prograph_shipper': { value: '0', pos: 639, len: 1 },
-	// 	  'prograph_paper_owner': { value: '0', pos: 640, len: 1 },
-	// 	  'prograph_advertiser': { value: '0', pos: 641, len: 1 },
-	// 	  'prograph_advertising_agency': { value: '0', pos: 642, len: 1 },
-	// 	  'allow_ps_access': { value: '0', pos: 643, len: 1 },
-	// 	  'psf_auto_accept_orders': { value: '0', pos: 644, len: 1 },
-	// 	  'printersite_exchange': { value: '0', pos: 645, len: 1 },
-	// 	  'available_in_printstream': { value: '0', pos: 646, len: 1 },
-	// 	  'ps_fulfillment': { value: '', pos: 647, len: 8 },
-	// 	  'ps_franchise_number': { value: '', pos: 655, len: 30 },
-	// 	  'ps_store_number': { value: '', pos: 685, len: 30 },
-	// 	  'ps_credit_hold': { value: '0', pos: 715, len: 1 },
-	// 	  'ar_stmt_finance_chg': { value: customer['Charge Finance Charges'] === 'Y' ? '1' : '0', pos: 716, len: 1 },
-	// 	  'allow_ops': { value: '0', pos: 717, len: 1 },
-	// 	  'iquote_customer_id': { value: '', pos: 718, len: 15 },
-	// 	  'arstatement_delivery': { value: 'Printer', pos: 733, len: 7 },
-	// 	  'batchcloseinv_delivery': { value: 'Printer', pos: 740, len: 7 },
-	// 	  'point_of_title_transfer': { value: 'Origin', pos: 747, len: 11 },
-	// 	};
-		
-	// 	return monarchCustomer;
-	//   });
-	// }
-	
-	// /**
-	//  * Map CSV data to Monarch jobs format
-	//  * @returns {Array} Array of job objects in Monarch format
-	//  */
-	// mapOrdersToMonarch() {
-	//   return this.orderData.map((order, index) => {
-	// 	// Create a unique job ID using the invoice number or generate one
-	// 	let jobId = '';
-	// 	if (order['Invoice Number']) {
-	// 	  jobId = order['Invoice Number'].toString().padStart(8, '0').substring(0, 8);
-	// 	} else {
-	// 	  jobId = (`JOB${index+1}`).padStart(8, '0').substring(0, 8);
-	// 	}
-		
-	// 	// Parse dates from order data
-	// 	const dueDate = order['Due date'] ? this.formatDate(order['Due date']) : '';
-	// 	const shipDate = order['Shipping date'] ? this.formatDate(order['Shipping date']) : '';
-		
-	// 	// Map the PO number from custom field
-	// 	const poNumber = order['Custom Field 1-po#'] || '';
-		
-	// 	// Get the customer ID from the customer data that matches this order
-	// 	const customerRecord = this.customerData.find(c => c['Customer Name'] === order['Customer Name']);
-	// 	const customerId = customerRecord ? customerRecord['Customer ID'] : '';
-		
-	// 	// Convert any numeric values to strings with proper formatting
-	// 	const qtyOrdered = order['Line: Quantity'] ? 
-	// 	  parseFloat(order['Line: Quantity']).toFixed(2).toString() : 
-	// 	  '';
-		
-	// 	const unitPrice = order['Line: Unit price'] ? 
-	// 	  parseFloat(order['Line: Unit price']).toFixed(2).toString() : 
-	// 	  '0.00';
-		
-	// 	const quotationAmount = order['Line: Amount'] ? 
-	// 	  parseFloat(order['Line: Amount']).toFixed(2).toString() : 
-	// 	  '0.00';
-		
-	// 	// Map order to Monarch job format according to exact specifications
-	// 	let ans = {
-	// 	  'job_id': { value: jobId, pos: 1, len: 8 },
-	// 	  'sub_job_id': { value: '', pos: 9, len: 4 },
-	// 	  'job_description': { value: order['Line: Product Name'] || '', pos: 13, len: 254 },
-	// 	  'job_type': { value: 'FG', pos: 267, len: 19 }, // Default to Finished Goods
-	// 	  'item_id': { value: '', pos: 286, len: 15 },
-	// 	  'cust_ordered_by': { value: customerId.substring(0, 8), pos: 301, len: 8 },
-	// 	  'cust_billed_to': { value: customerId.substring(0, 8), pos: 309, len: 8 },
-	// 	  'sales_class_id': { value: '', pos: 317, len: 8 },
-	// 	  'po_number': { value: poNumber.substring(0, 20), pos: 325, len: 20 },
-	// 	  'date_promised': { value: dueDate, pos: 345, len: 10 },
-	// 	  'ship_date': { value: shipDate, pos: 355, len: 10 },
-	// 	  'qty_ordered': { value: qtyOrdered, pos: 365, len: 11 },
-	// 	  'priority': { value: '2', pos: 376, len: 10 }, // Default to medium priority
-	// 	  'contact_name': { value: '', pos: 386, len: 30 },
-	// 	  'expense_code': { value: '', pos: 416, len: 24 },
-	// 	  'shop_floor_active': { value: '1', pos: 440, len: 1 },
-	// 	  'form_number': { value: '', pos: 441, len: 20 },
-	// 	  'quotation_amount': { value: quotationAmount, pos: 461, len: 15 },
-	// 	  'unit_of_measure_id': { value: 'EA', pos: 476, len: 4 }, // Default to Each
-	// 	  'unit_price': { value: unitPrice, pos: 480, len: 16 },
-	// 	  'job_title': { value: order['Line: Product Name'] ? order['Line: Product Name'].substring(0, 50) : '', pos: 496, len: 50 },
-	// 	  'forest_type_id': { value: '', pos: 546, len: 15 },
-	// 	};
-	// 	console.log('ans', ans);
-	// 	return ans;
-	//   });
-	// }
-	
-	// /**
-	//  * Generate fixed-width customer import file
-	//  * @returns {string} Fixed-width text file content
-	//  */
-	// generateCustomerImportFile() {
-	//   const customers = this.mapCustomersToMonarch();
-	//   let result = '';
-	  
-	//   customers.forEach(customer => {
-	// 	// Create a line of spaces of the required length (757 characters)
-	// 	const line = new Array(757 + 1).join(' ').split('');
-		
-	// 	// Place each field at its proper position
-	// 	for (const [field, def] of Object.entries(customer)) {
-	// 	  if (def.value) {
-	// 		const value = def.value.toString();
-	// 		const pos = def.pos - 1; // Convert to 0-based index
-	// 		const len = def.len;
-			
-	// 		// Place the value in the line array, truncating if necessary
-	// 		for (let i = 0; i < Math.min(len, value.length); i++) {
-	// 		  if (pos + i < line.length) {
-	// 			line[pos + i] = value[i];
-	// 		  }
-	// 		}
-	// 	  }
-	// 	}
-		
-	// 	// Add the line to the result
-	// 	result += line.join('') + '\n';
-	//   });
-	  
-	//   return result;
-	// }
 	
 	/**
 	 * Generate fixed-width job import file
@@ -1045,14 +1208,43 @@ cleanProductDescription(description) {
   
   // Main application code
   document.addEventListener('DOMContentLoaded', function() {
-	// Elements
-	const zipDropzone = document.getElementById('zip-dropzone');
-	const zipFileInput = document.getElementById('zip-file');
-	const customerFileInput = document.getElementById('customer-file');
-	const orderFileInput = document.getElementById('order-file');
-	const paymentFileInput = document.getElementById('payment-file');
-	const generateBtn = document.getElementById('generate-btn');
-	const logElement = document.getElementById('log');
+
+	// clear the local storage
+	localStorage.clear();
+
+	  // Tab switching functionality (add this at the start)
+	  const tabButtons = document.querySelectorAll('.tab-btn');
+	  const tabContents = document.querySelectorAll('.tab-content');
+	  
+	  tabButtons.forEach(button => {
+		button.addEventListener('click', () => {
+		  // Remove active class from all buttons and contents
+		  tabButtons.forEach(btn => btn.classList.remove('active'));
+		  tabContents.forEach(content => content.classList.remove('active'));
+		  
+		  // Add active class to clicked button and corresponding content
+		  button.classList.add('active');
+		  const tabId = button.getAttribute('data-tab');
+		  document.getElementById(tabId).classList.add('active');
+		});
+	  });
+
+  // Original Job Import Elements (rename existing elements to match the new HTML)
+  const zipDropzone = document.getElementById('zip-dropzone');
+  const zipFileInput = document.getElementById('zip-file');
+  const customerFileInput = document.getElementById('customer-file');
+  const orderFileInput = document.getElementById('order-file');
+  const paymentFileInput = document.getElementById('payment-file');
+  // Change this line: update the ID to match the new HTML
+  const generateJobBtn = document.getElementById('generate-job-btn');
+  
+  // New Customer Import Elements (add these new elements)
+  const customerListDropzone = document.getElementById('customer-list-dropzone');
+  const customerListFileInput = document.getElementById('customer-list-file');
+  const generateCustomerBtn = document.getElementById('generate-customer-btn');
+  
+  // Log element (keep this the same)
+  const logElement = document.getElementById('log');
 	
 	// Store file objects
 	const files = {
@@ -1061,34 +1253,60 @@ cleanProductDescription(description) {
 	  payment: null
 	};
 	
-	// Monarch importer instance
-	const monarchImporter = new MonarchImporter();
+  // Store customer list file (add this)
+  let customerListFile = null;
+  
+  // Create importer instances
+  const monarchImporter = new MonarchImporter();
+  // Add this line:
+  const customerListImporter = new CustomerListImporter();
+  
+// Initialize the file viewer
+const fileViewer = new MonarchFileViewer();
+fileViewer.initialize();
+
+  
+  // Helper function to log messages (keep this)
+  function logMessage(message, type = 'info') {
+    const logEntry = document.createElement('div');
+    logEntry.className = `log-entry ${type}`;
+    logEntry.textContent = message;
+    logElement.appendChild(logEntry);
+    logElement.scrollTop = logElement.scrollHeight;
+  }
 	
-	// Helper function to log messages
-	function logMessage(message, type = 'info') {
-	  const logEntry = document.createElement('div');
-	  logEntry.className = `log-entry ${type}`;
-	  logEntry.textContent = message;
-	  logElement.appendChild(logEntry);
-	  logElement.scrollTop = logElement.scrollHeight;
-	}
-	
-	// Update file status indicators
-	function updateFileStatus(fileType, isFound) {
-	  const statusElement = document.getElementById(`${fileType}-status`);
-	  const textElement = document.getElementById(`${fileType}-text`);
-	  
-	  if (isFound) {
-		statusElement.className = 'status-indicator status-found';
-		textElement.textContent = 'Found';
-	  } else {
-		statusElement.className = 'status-indicator status-missing';
-		textElement.textContent = 'Not found';
+  // Update file status indicators (modify this to match the new button ID)
+  function updateFileStatus(fileType, isFound) {
+    const statusElement = document.getElementById(`${fileType}-status`);
+    const textElement = document.getElementById(`${fileType}-text`);
+    
+    if (isFound) {
+      statusElement.className = 'status-indicator status-found';
+      textElement.textContent = 'Found';
+    } else {
+      statusElement.className = 'status-indicator status-missing';
+      textElement.textContent = 'Not found';
+    }
+    
+    // Enable/disable generate button (update this line to match the new button ID)
+    generateJobBtn.disabled = !(files.customer && files.order);
+  }
+ 
+    // Add new function for customer list status
+	function updateCustomerListStatus(isFound) {
+		const statusElement = document.getElementById('customer-list-status');
+		const textElement = document.getElementById('customer-list-text');
+		
+		if (isFound) {
+		  statusElement.className = 'status-indicator status-found';
+		  textElement.textContent = 'Found';
+		  generateCustomerBtn.disabled = false;
+		} else {
+		  statusElement.className = 'status-indicator status-missing';
+		  textElement.textContent = 'Not found';
+		  generateCustomerBtn.disabled = true;
+		}
 	  }
-	  
-	  // Enable/disable generate button
-	  generateBtn.disabled = !(files.customer && files.order);
-	}
 	
 	// Set up ZIP file drag and drop
 	zipDropzone.addEventListener('dragover', (e) => {
@@ -1111,6 +1329,10 @@ cleanProductDescription(description) {
 	  const droppedFiles = e.dataTransfer.files;
 	  if (droppedFiles.length > 0 && droppedFiles[0].type === 'application/zip') {
 		await processZipFile(droppedFiles[0]);
+
+		if (files.customer && files.order) {
+			processJobFiles();
+		}
 	  } else {
 		logMessage('Please drop a ZIP file.', 'error');
 	  }
@@ -1162,6 +1384,96 @@ cleanProductDescription(description) {
 	  }
 	}
 	
+	 // Add new customer list drag and drop handlers
+	 customerListDropzone.addEventListener('dragover', (e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		customerListDropzone.classList.add('highlight');
+	  });
+	  
+	  customerListDropzone.addEventListener('dragleave', (e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		customerListDropzone.classList.remove('highlight');
+	  });
+	  
+	  customerListDropzone.addEventListener('drop', (e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		customerListDropzone.classList.remove('highlight');
+		
+		const droppedFiles = e.dataTransfer.files;
+		if (droppedFiles.length > 0) {
+		  const file = droppedFiles[0];
+		  if (file.name.endsWith('.csv') || file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+			customerListFile = file;
+			updateCustomerListStatus(true);
+			logMessage(`Customer list file selected: ${file.name}`);
+			processCustomerFile();
+		  } else {
+			logMessage('Please drop a CSV or Excel file.', 'error');
+		  }
+		}
+	  });
+	  
+	  customerListDropzone.addEventListener('click', () => {
+		customerListFileInput.click();
+	  });
+	  
+	  customerListFileInput.addEventListener('change', (e) => {
+		if (e.target.files.length > 0) {
+		  customerListFile = e.target.files[0];
+		  updateCustomerListStatus(true);
+		  logMessage(`Customer list file selected: ${customerListFile.name}`);
+		      // Process immediately if we have a valid file
+			processCustomerFile();
+		}
+	  });
+	
+	  // Add a helper function for processing customer files
+		function processCustomerFile() {
+			if (customerListFile) {
+			logMessage('Processing customer list file...');
+			// load the Monarch job import file into the file viewer
+			if (window.fileViewer) {
+				window.fileViewer.loadFile('customer');
+			}
+			customerListImporter.processFile(customerListFile)
+				.then(result => {
+				if (result.success) {
+					logMessage(result.message, 'success');
+				} else {
+					logMessage(result.message, 'error');
+				}
+				})
+				.catch(error => {
+				logMessage(`Error: ${error.message}`, 'error');
+				});
+			}
+		}
+
+		function processJobFiles() {
+			if (files.customer && files.order) {
+			  logMessage('Processing job files...');
+			  // load the Monarch job import file into the file viewer
+			  if (window.fileViewer) {
+				window.fileViewer.loadFile('job');
+			  }
+			  monarchImporter.processFiles(files)
+				.then(result => {
+				  if (result.success) {
+					logMessage(result.message, 'success');
+				  } else {
+					logMessage(result.message, 'error');
+				  }
+				})
+				.catch(error => {
+				  logMessage(`Error: ${error.message}`, 'error');
+				});
+			}
+		  }
+
+	
 	// Individual file uploads
 	customerFileInput.addEventListener('change', (e) => {
 	  if (e.target.files.length > 0) {
@@ -1187,38 +1499,61 @@ cleanProductDescription(description) {
 	  }
 	});
 	
-	// Generate button click handler
-	generateBtn.addEventListener('click', async () => {
-	  if (!files.customer || !files.order) {
-		logMessage('Missing required files. Need at least Customer and Order data.', 'error');
-		return;
-	  }
-	  
-	  logMessage('Generating Monarch import files...');
-	  
-	  try {
-		const result = await monarchImporter.processFiles(files);
-		
-		if (result.success) {
-		  logMessage(result.message, 'success');
-		} else {
-		  logMessage(result.message, 'error');
+	// Update this part to use the new button ID
+	generateJobBtn.addEventListener('click', async () => {
+		if (!files.customer || !files.order) {
+		  logMessage('Missing required files. Need at least Customer and Order data.', 'error');
+		  return;
 		}
-	  } catch (error) {
-		logMessage(`Error: ${error.message}`, 'error');
-	  }
-	});
+		
+		logMessage('Generating Monarch job import file...');
+		
+		try {
+		  const result = await monarchImporter.processFiles(files);
+		  
+		  if (result.success) {
+			logMessage(result.message, 'success');
+			// load the Monarch job import file into the file viewer
+			if (window.fileViewer) {
+				window.fileViewer.loadFile('job');
+			}
+		  } else {
+			logMessage(result.message, 'error');
+		  }
+		} catch (error) {
+		  logMessage(`Error: ${error.message}`, 'error');
+		}
+	  });
+	  
 
 	logMessage('Ready to process files. Upload ZIP or individual CSV files to begin.');
+
+	  // Add new customer list button handler
+	  generateCustomerBtn.addEventListener('click', async () => {
+		if (!customerListFile) {
+		  logMessage('No customer list file selected.', 'error');
+		  return;
+		}
+		
+		logMessage('Generating Monarch customer import file...');
+		
+		try {
+		  const result = await customerListImporter.processFile(customerListFile);
+		  
+		  if (result.success) {
+			logMessage(result.message, 'success');
+		  } else {
+			logMessage(result.message, 'error');
+		  }
+		} catch (error) {
+		  logMessage(`Error: ${error.message}`, 'error');
+		}
+	  });
 
 	/**
 	 * Add this code to the end of your DOMContentLoaded event handler
 	 * to integrate the file viewer with your existing code.
 	 */
-
-	// Initialize the file viewer
-	const fileViewer = new MonarchFileViewer();
-	fileViewer.initialize();
 
 	/**
 	 * Fix for empty file downloads
@@ -1229,48 +1564,51 @@ cleanProductDescription(description) {
 	// Modify the processFiles method in MonarchImporter to store files for the viewer
 	// but keep the original download functionality
 	const originalProcessFiles = MonarchImporter.prototype.processFiles;
+	/**
+	 * Process all files and generate Monarch import files
+	 * @param {Object} files - Object containing File objects for customer, order, and payment CSV files
+	 */
 	MonarchImporter.prototype.processFiles = async function(files) {
-	try {
-		// Parse all CSV files - Keep this part from the original function
+		try {
+		// Parse all CSV files
 		const promises = [];
 		if (files.customer) {
-		promises.push(this.parseCSVFile(files.customer, 'customer'));
+			promises.push(this.parseCSVFile(files.customer, 'customer'));
 		}
 		if (files.order) {
-		promises.push(this.parseCSVFile(files.order, 'order'));
+			promises.push(this.parseCSVFile(files.order, 'order'));
 		}
 		if (files.payment) {
-		promises.push(this.parseCSVFile(files.payment, 'payment'));
+			promises.push(this.parseCSVFile(files.payment, 'payment'));
 		}
 		
 		await Promise.all(promises);
 		
-		// Generate Monarch import files
-		const customerImport = this.generateCustomerImportFile();
+		// Generate job import file only (like original)
 		const jobImport = this.generateJobImportFile();
 		
-		// Store in localStorage for the viewer BEFORE downloading
-		localStorage.setItem('monarch_customer_import', customerImport);
-		localStorage.setItem('monarch_job_import', jobImport);
-		
-		// Download the files - keep the original download code
-		this.downloadTextFile(customerImport, 'monarch_customer_import.txt');
+		// Download the job file
 		this.downloadTextFile(jobImport, 'monarch_job_import.txt');
 		
-		// Add message about the viewer
-		logMessage('Files are ready to view in the File Viewer below', 'success');
+		// Store in localStorage for the viewer
+		localStorage.setItem('monarch_job_import', jobImport);
+		
+		// Show the job file in the viewer automatically
+		if (window.fileViewer) {
+			window.fileViewer.loadFile('job');
+		}
 		
 		return {
-		success: true,
-		message: 'Monarch import files generated successfully!'
+			success: true,
+			message: 'Monarch job import file generated successfully!'
 		};
-	} catch (error) {
+		} catch (error) {
 		console.error('Error processing files:', error);
 		return {
-		success: false,
-		message: `Error processing files: ${error.message}`
+			success: false,
+			message: `Error processing files: ${error.message}`
 		};
-	}
+		}
 	};
 
 	// Add this to your MonarchImporter class to fix product descriptions
@@ -1304,6 +1642,41 @@ cleanProductDescription(description) {
 	}
 	
 	return description;
+	};
+
+	/**
+	 * Process customer list file and generate Monarch import file
+	 * @param {File} file - Customer list file
+	 * @returns {Promise} Promise resolving to result object
+	 */
+	CustomerListImporter.prototype.processFile = async function(file) {
+		try {
+		// Parse the file
+		await this.parseCustomerListFile(file);
+		
+		// Generate and download import file
+		const customerImport = this.generateCustomerImportFile();
+		this.downloadTextFile(customerImport, 'monarch_customer_import.txt');
+		
+		// Store in localStorage for the viewer
+		localStorage.setItem('monarch_customer_import', customerImport);
+		
+		// Show the customer file in the viewer automatically
+		if (window.fileViewer) {
+			window.fileViewer.loadFile('customer');
+		}
+		
+		return {
+			success: true,
+			message: 'Customer import file generated successfully!'
+		};
+		} catch (error) {
+		console.error('Error processing customer list:', error);
+		return {
+			success: false,
+			message: `Error processing customer list: ${error.message}`
+		};
+		}
 	};
 
 	// Modify the mapOrdersToMonarch method to use the cleanProductDescription function
@@ -1340,5 +1713,48 @@ cleanProductDescription(description) {
 		return job;
 	});
 	};
+
+	// Simple file viewer integration
+	// This avoids complex method replacement
+	function setupFileViewerIntegration() {
+		// Keep a reference to the original download functions
+		const originalCustomerImporterDownload = CustomerListImporter.prototype.downloadTextFile;
+		const originalMonarchImporterDownload = MonarchImporter.prototype.downloadTextFile;
+		
+		// Add localStorage and viewer update to customer importer
+		CustomerListImporter.prototype.downloadTextFile = function(content, filename) {
+		// Still do the original download
+		originalCustomerImporterDownload.call(this, content, filename);
+		
+		// Store in localStorage and update viewer if it's a customer import file
+		if (filename === 'monarch_customer_import.txt') {
+			localStorage.setItem('monarch_customer_import', content);
+			
+			// Show the file in the viewer if it exists
+			if (window.fileViewer) {
+			window.fileViewer.loadFile('customer');
+			}
+		}
+		};
+		
+		// Add localStorage and viewer update to job importer
+		MonarchImporter.prototype.downloadTextFile = function(content, filename) {
+		// Still do the original download
+		originalMonarchImporterDownload.call(this, content, filename);
+		
+		// Store in localStorage and update viewer if it's a job import file
+		if (filename === 'monarch_job_import.txt') {
+			localStorage.setItem('monarch_job_import', content);
+			
+			// Show the file in the viewer if it exists
+			if (window.fileViewer) {
+			window.fileViewer.loadFile('job');
+			}
+		}
+		};
+	}
+	
+	// Call this function to set up the file viewer integration
+	setupFileViewerIntegration();
 	
 });	
