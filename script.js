@@ -542,7 +542,7 @@ class MonarchFileViewer {
 		const scrollLeft = viewerContent.scrollLeft || 0;
 		// const x = event.clientX - viewerRect.left + scrollLeft;
 		// that is always saying 2 further than it should be
-		const x = event.clientX - viewerRect.left + scrollLeft - 13;
+		const x = event.clientX - viewerRect.left + scrollLeft - 10;
 		
 		// Calculate the position based on the monospace font width
 		const charWidth = 7.8; // Approximate width of monospace character
@@ -1446,10 +1446,8 @@ fileViewer.initialize();
 		function processCustomerFile() {
 			if (customerListFile) {
 			logMessage('Processing customer list file...');
-			// load the Monarch job import file into the file viewer
-			if (window.fileViewer) {
-				window.fileViewer.loadFile('customer');
-			}
+				let fileViewer = new MonarchFileViewer();
+				fileViewer.loadFile('customer');
 			customerListImporter.processFile(customerListFile)
 				.then(result => {
 				if (result.success) {
@@ -1468,9 +1466,8 @@ fileViewer.initialize();
 			if (files.customer && files.order) {
 			  logMessage('Processing job files...');
 			  // load the Monarch job import file into the file viewer
-			  if (window.fileViewer) {
-				window.fileViewer.loadFile('job');
-			  }
+			  let fileViewer = new MonarchFileViewer();
+			  fileViewer.loadFile('job');
 			  monarchImporter.processFiles(files)
 				.then(result => {
 				  if (result.success) {
@@ -1606,9 +1603,11 @@ fileViewer.initialize();
 		localStorage.setItem('monarch_job_import', jobImport);
 		
 		// Show the job file in the viewer automatically
-		if (window.fileViewer) {
-			window.fileViewer.loadFile('job');
-		}
+		// if (window.fileViewer) {
+		// 	window.fileViewer.loadFile('job');
+		// }
+		let fileViewer = new MonarchFileViewer();
+		fileViewer.loadFile('job');
 		
 		return {
 			success: true,
@@ -1743,9 +1742,11 @@ fileViewer.initialize();
 			localStorage.setItem('monarch_customer_import', content);
 			
 			// Show the file in the viewer if it exists
-			if (window.fileViewer) {
-			window.fileViewer.loadFile('customer');
-			}
+			// if (window.fileViewer) {
+			// window.fileViewer.loadFile('customer');
+			// }
+			let fileViewer = new MonarchFileViewer();
+			fileViewer.loadFile('customer');
 		}
 		};
 		
@@ -1759,9 +1760,11 @@ fileViewer.initialize();
 			localStorage.setItem('monarch_job_import', content);
 			
 			// Show the file in the viewer if it exists
-			if (window.fileViewer) {
-			window.fileViewer.loadFile('job');
-			}
+			// if (window.fileViewer) {
+			// window.fileViewer.loadFile('job');
+			// }
+			let fileViewer = new MonarchFileViewer();
+			fileViewer.loadFile('job');
 		}
 		};
 	}
