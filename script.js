@@ -79,9 +79,11 @@ class CustomerListImporter {
 	 * @returns {Array} Array of customer objects in Monarch format
 	 */
 	mapCustomerListToMonarch() {
+	  let custCode = 0;
 	  return this.customerListData.map(customer => {
+		custCode++;
 		// Extract customer data with fallbacks to empty strings
-		const custCode = (customer.accountName || customer.customerID || '').toString().substring(0, 8);
+		// const custCode = (customer.accountName || customer.customerID || '').toString().substring(0, 8);
 		const custName = (customer.accountName || '').toString().substring(0, 40);
 		
 		// Address information
@@ -113,6 +115,9 @@ class CustomerListImporter {
 		
 		// Determine PO Required based on available data
 		const poRequired = customer.requirePO === 'Y' ? '1' : '0';
+		
+		// needs to iterate for
+
 		
 		// Create Monarch fixed-width format mapping
 		return {
@@ -889,8 +894,7 @@ parseCSV(csvString) {
 	}
 	
 /**
- * Map CSV data to Monarch customer format with enhanced field mappings
- * @returns {Array} Array of customer objects in Monarch format
+ * this entire method is now redundant and it needs to go
  */
 mapCustomersToMonarch() {
 	return this.customerData.map(customer => {
@@ -929,7 +933,7 @@ mapCustomersToMonarch() {
 	  
 	  return {
 		// Customer identification - positions based on the provided requirements
-		'Cust-code': { value: custCode, pos: 1, len: 8 },
+		'Cust-code': { value: '1', pos: 1, len: 8 },
 		'Cust-name': { value: customer['Customer Name'] || '', pos: 9, len: 40 },
 		
 		// Address information
@@ -1146,10 +1150,10 @@ formatDate(date) {
 		await Promise.all(promises);
 		
 		// Generate and download Monarch import files
-		const customerImport = this.generateCustomerImportFile();
+		// const customerImport = this.generateCustomerImportFile();
 		const jobImport = this.generateJobImportFile();
 		
-		this.downloadTextFile(customerImport, 'monarch_customer_import.txt');
+		// this.downloadTextFile(customerImport, 'monarch_customer_import.txt');
 		this.downloadTextFile(jobImport, 'monarch_job_import.txt');
 		
 		return {
