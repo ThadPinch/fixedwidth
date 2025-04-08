@@ -221,6 +221,64 @@ class CustomerListImporter {
 		
 		// Determine PO Required based on available data
 		const poRequired = customer.requirePO === 'Y' ? '1' : '0';
+
+		/**
+		 * Mapping array for shipment methods to codes
+		 * Maps the shipMethod ID to the corresponding code for Monarch import
+		 */
+		const shipMethodMap = [ 
+			// UPS Methods (from Image 1)
+			{ id: 5, method: "UPS Ground", code: "UPSGRND" },
+			{ id: 6, method: "UPS 3 Day Select", code: "UPS3DAY" },
+			{ id: 7, method: "UPS 2nd Day Air", code: "UPS2DAY" },
+			{ id: 8, method: "UPS Next Day Air", code: "UPS1DAY" },
+			{ id: 14, method: "UPS Next Day Air Saver", code: "UPS1DAY" },
+			{ id: 15, method: "UPS Next Day Air Early A.M.", code: "UPS1DAY" },
+			{ id: 17, method: "UPS 2nd Day Air A.M.", code: "UPS2DAY" },
+			{ id: 19, method: "UPS Next Day Air Early A.M. (Saturday)", code: "UPS1DAY" },
+			{ id: 20, method: "UPS Next Day Air (Saturday)", code: "UPS1DAY" },
+			{ id: 21, method: "UPS 2nd Day Air (Saturday)", code: "UPS2DAY" },
+			{ id: 24, method: "UPS Saver", code: "UPSSAVR" },
+			{ id: 25, method: "UPS Worldwide Express", code: "UPSWWEX" },
+			{ id: 26, method: "UPS Worldwide Expedited", code: "UPSWWED" },
+			{ id: 27, method: "UPS Worldwide Express Plus", code: "UPSWWEP" },
+			{ id: 54, method: "UPS Standard", code: "UPSSTD" },
+			{ id: 86, method: "Ground", code: "DELGND" },
+		  
+			// FedEx Methods (from Image 2)
+			{ id: 1, method: "FedEx Ground", code: "FEDXGND" },
+			{ id: 2, method: "FedEx 2Day", code: "FEDX2DY" },
+			{ id: 3, method: "FedEx Express Saver", code: "FEDXEXP" },
+			{ id: 4, method: "FedEx Standard Overnight", code: "FEDXSTD" },
+			{ id: 28, method: "FedEx First Overnight", code: "FEDX1ST" },
+			{ id: 29, method: "FedEx Priority Overnight (Saturday Delivery)", code: "FEDXPRI" },
+			{ id: 30, method: "FedEx Priority Overnight", code: "FEDXPRI" },
+			{ id: 31, method: "FedEx 2Day (Saturday Delivery)", code: "FEDX2DY" },
+			{ id: 32, method: "FedEx 1Day Freight", code: "FEDX1DF" },
+			{ id: 33, method: "FedEx 1Day Freight (Saturday Delivery)", code: "FEDX1DF" },
+			{ id: 34, method: "FedEx 2Day Freight", code: "FEDX2DF" },
+			{ id: 35, method: "FedEx 2Day Freight (Saturday Delivery)", code: "FEDX2DF" },
+			{ id: 37, method: "FedEx 3Day Freight", code: "FEDX3DF" },
+			{ id: 38, method: "FedEx Europe First International Priority", code: "FEDXEIP" },
+			{ id: 39, method: "FedEx International Economy", code: "FEDXIEC" },
+			{ id: 40, method: "FedEx International Economy Freight", code: "FEDXIEF" },
+			{ id: 41, method: "FedEx International First", code: "FEDXIFR" },
+			{ id: 42, method: "FedEx International Priority", code: "FEDXIPR" },
+			{ id: 43, method: "FedEx International Priority Freight", code: "FEDXIPF" },
+			{ id: 44, method: "FedEx Ground Home Delivery", code: "FEDXGHD" },
+			{ id: 80, method: "FedEx International Ground Canada", code: "FEDXIGC" },
+			{ id: 82, method: "FedEx International Priority Express", code: "FEDXIPE" },
+			{ id: 90, method: "FedEx Ground", code: "FEDXGND" },
+		  
+			// Additional methods mentioned
+			{ id: 11, method: "Will Call", code: "WILLCALL" },
+			{ id: 18, method: "Delivery", code: "DELIVERY" },
+			{ id: 87, method: "Delivery", code: "DELIVERY" }
+		  ];
+		
+		// Shipment-Method-ID
+		const shipMethod = shipMethodMap.find(method => method.id === customer.shipMethod);
+		const shipMethodCode = shipMethod ? shipMethod.code : '';
 		
 		// Create Monarch fixed-width format mapping
 		return {
@@ -249,12 +307,12 @@ class CustomerListImporter {
 		  'territory-id': { value: '', pos: 423, len: 12 },
 		  'Cust-ID-Bill-to': { value: '', pos: 435, len: 8 },
 		  'Group-ID': { value: '', pos: 443, len: 12 },
-		  'Priority': { value: 'Normal', pos: 455, len: 10 },
+		  'Priority': { value: '', pos: 455, len: 10 },
 		  'Estimate-Markup-Pct': { value: '', pos: 465, len: 6 },
 		  'Overs-Allowed': { value: '', pos: 471, len: 5 },
 		  'Date-First-Order': { value: this.formatDate(new Date()), pos: 476, len: 10 },
 		  'PO-Required': { value: poRequired, pos: 486, len: 1 },
-		  'AR-Stmt': { value: '1', pos: 487, len: 1 },
+		  'AR-Stmt': { value: '0', pos: 487, len: 1 },
 		  'AR-Stmt-Dunning-Msg': { value: '0', pos: 488, len: 1 },
 		  
 		  // Inter-company settings
@@ -264,43 +322,44 @@ class CustomerListImporter {
 		  // Banking and financial information
 		  'Bank': { value: '', pos: 502, len: 20 },
 		  'Bank-acct-num': { value: '', pos: 522, len: 20 },
-		  'Sales-tax-exempt': { value: customer.taxExemptionCertificate ? '1' : '0', pos: 542, len: 20 },
+		  'Sales-tax-exempt': { value: '', pos: 542, len: 20 },
 		  'Credit-Limit': { value: '0', pos: 562, len: 14 },
 		  
 		  // Shipping information
-		  'Shipment-Method-ID': { value: customer.shipMethod ? customer.shipMethod.toString().substring(0, 8) : '', pos: 576, len: 8 },
-		  'Tax-Number': { value: customer.taxExemptionCertificate || '', pos: 584, len: 20 },
+		  'Shipment-Method-ID': { value: shipMethodCode, pos: 576, len: 8 },
+		  'Tax-Number': { value: '', pos: 584, len: 20 },
 		  'Addl-Tax-Number': { value: '', pos: 604, len: 20 },
-		  'Industry-Code': { value: customer.accountType ? customer.accountType.toString().substring(0, 8) : '', pos: 624, len: 8 },
+		//   'Industry-Code': { value: customer.accountType ? customer.accountType.toString().substring(0, 8) : '', pos: 624, len: 8 },
+		  'Industry-Code': { value: '', pos: 624, len: 8 },
 		  
 		  // Locale and system settings
 		  'Locale-ID': { value: 'en_US', pos: 632, len: 6 },
-		  'Prograph-Customer-Type': { value: '0', pos: 638, len: 1 },
-		  'Prograph-Shipper': { value: '0', pos: 639, len: 1 },
-		  'Prograph-Paper-Owner': { value: '0', pos: 640, len: 1 },
-		  'Prograph-Advertiser': { value: '0', pos: 641, len: 1 },
-		  'Prograph-Advertising-Agency': { value: '0', pos: 642, len: 1 },
+		  'Prograph-Customer-Type': { value: '', pos: 638, len: 1 },
+		  'Prograph-Shipper': { value: '', pos: 639, len: 1 },
+		  'Prograph-Paper-Owner': { value: '', pos: 640, len: 1 },
+		  'Prograph-Advertiser': { value: '', pos: 641, len: 1 },
+		  'Prograph-Advertising-Agency': { value: '', pos: 642, len: 1 },
 		  
 		  // Web access flags
-		  'Allow-PSF-Access': { value: '0', pos: 643, len: 1 },
-		  'PSF-Auto-Accept-Orders': { value: '0', pos: 644, len: 1 },
-		  'PrinterSite-Exchange': { value: '0', pos: 645, len: 1 },
+		  'Allow-PSF-Access': { value: '', pos: 643, len: 1 },
+		  'PSF-Auto-Accept-Orders': { value: '', pos: 644, len: 1 },
+		  'PrinterSite-Exchange': { value: '', pos: 645, len: 1 },
 		  'Available-in-PrintStream': { value: '0', pos: 646, len: 1 },
 		  
 		  // PrinterSite settings
 		  'PS-Fulfillment': { value: '', pos: 647, len: 8 },
 		  'PS-Franchise-Number': { value: '', pos: 655, len: 30 },
 		  'PS-Store-Number': { value: '', pos: 685, len: 30 },
-		  'PS-Credit-Hold': { value: '0', pos: 715, len: 1 },
+		  'PS-Credit-Hold': { value: '', pos: 715, len: 1 },
 		  
 		  // Finance and AR settings
-		  'AR-Stmt-Finance-Chrg': { value: '0', pos: 716, len: 1 },
-		  'Allow-OPS': { value: '0', pos: 717, len: 1 },
+		  'AR-Stmt-Finance-Chrg': { value: '', pos: 716, len: 1 },
+		  'Allow-OPS': { value: '', pos: 717, len: 1 },
 		  'iQuote-Customer-ID': { value: '', pos: 718, len: 15 },
 		  
 		  // Document delivery options
 		  'ARStatementDelivery': { value: 'Printer', pos: 733, len: 7 },
-		  'BatchCloseInvDelivery': { value: 'Printer', pos: 740, len: 7 },
+		  'BatchCloseInvDelivery': { value: 'None', pos: 740, len: 7 },
 		  'PointOfTitleTransfer': { value: 'Origin', pos: 747, len: 11 }
 		};
 	  });
