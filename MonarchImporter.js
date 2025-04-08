@@ -374,5 +374,3 @@ class MonarchImporter {
 	}
   }
   
-  // Export the class
-  export default MonarchImporter;

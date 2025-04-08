@@ -1,7 +1,3 @@
-// Import all classes
-import CustomerListImporter from './CustomerListImporter.js';
-import MonarchFileViewer from './MonarchFileViewer.js';
-import MonarchImporter from './MonarchImporter.js';
 
 // Main application code
 document.addEventListener('DOMContentLoaded', function() {
@@ -38,6 +34,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const customerListFileInput = document.getElementById('customer-list-file');
   const generateCustomerBtn = document.getElementById('generate-customer-btn');
   
+// Update these elements to handle ZIP files
+customerListFileInput.setAttribute('accept', '.zip');
   // Log element
   const logElement = document.getElementById('log');
   
@@ -208,6 +206,7 @@ document.addEventListener('DOMContentLoaded', function() {
     customerListDropzone.classList.remove('highlight');
   });
   
+  // Update customer list drop handlers
   customerListDropzone.addEventListener('drop', (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -216,13 +215,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const droppedFiles = e.dataTransfer.files;
     if (droppedFiles.length > 0) {
       const file = droppedFiles[0];
-      if (file.name.endsWith('.csv') || file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      if (file.name.endsWith('.zip')) {
         customerListFile = file;
         updateCustomerListStatus(true);
-        logMessage(`Customer list file selected: ${file.name}`);
-        processCustomerFile();
+        logMessage(`Customer ZIP file selected: ${file.name}`);
+        // Don't process immediately - wait for button click
       } else {
-        logMessage('Please drop a CSV or Excel file.', 'error');
+        logMessage('Please drop a ZIP file containing customer and user data.', 'error');
       }
     }
   });
@@ -231,27 +230,47 @@ document.addEventListener('DOMContentLoaded', function() {
     customerListFileInput.click();
   });
   
+  // Update customer list input change handler
   customerListFileInput.addEventListener('change', (e) => {
     if (e.target.files.length > 0) {
-      customerListFile = e.target.files[0];
-      updateCustomerListStatus(true);
-      logMessage(`Customer list file selected: ${customerListFile.name}`);
-      // Process immediately if we have a valid file
-      processCustomerFile();
+      const file = e.target.files[0];
+      if (file.name.endsWith('.zip')) {
+        customerListFile = file;
+        updateCustomerListStatus(true);
+        logMessage(`Customer ZIP file selected: ${file.name}`);
+      } else {
+        logMessage('Please select a ZIP file containing customer and user data.', 'error');
+        updateCustomerListStatus(false);
+      }
     }
   });
   
-  /**
-   * Process customer file
-   */
+  // Update process customer file function
   function processCustomerFile() {
     if (customerListFile) {
-      logMessage('Processing customer list file...');
-      fileViewer.loadFile('customer');
-      customerListImporter.processFile(customerListFile)
+      logMessage('Processing customer ZIP file...');
+      
+      // Create an instance of CustomerListImporter for each operation
+      // to avoid conflicts with any stored data
+      const importer = new CustomerListImporter();
+      
+      importer.processFile(customerListFile)
         .then(result => {
           if (result.success) {
+            const summary = result.summary || {};
             logMessage(result.message, 'success');
+            
+            // Add a summary of the import
+            if (summary.customers && summary.users) {
+              logMessage(`Processed ${summary.customers} customers and ${summary.users} users.`, 'info');
+              
+              if (summary.emailsMatched !== undefined) {
+                logMessage(`Found email addresses for ${summary.emailsMatched} customers.`, 'info');
+              }
+            }
+            
+            // Load the file in the viewer
+            fileViewer.loadFile('customer');
           } else {
             logMessage(result.message, 'error');
           }
@@ -259,6 +278,8 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
           logMessage(`Error: ${error.message}`, 'error');
         });
+    } else {
+      logMessage('No customer ZIP file selected.', 'error');
     }
   }
 
@@ -331,27 +352,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
-  // Generate customer import file
-  generateCustomerBtn.addEventListener('click', async () => {
+   // Update the generate button click handler
+   generateCustomerBtn.addEventListener('click', () => {
     if (!customerListFile) {
-      logMessage('No customer list file selected.', 'error');
+      logMessage('No customer ZIP file selected.', 'error');
       return;
     }
     
     logMessage('Generating Monarch customer import file...');
-    
-    try {
-      const result = await customerListImporter.processFile(customerListFile);
-      
-      if (result.success) {
-        logMessage(result.message, 'success');
-        fileViewer.loadFile('customer');
-      } else {
-        logMessage(result.message, 'error');
-      }
-    } catch (error) {
-      logMessage(`Error: ${error.message}`, 'error');
-    }
+    processCustomerFile();
   });
 
   logMessage('Ready to process files. Upload ZIP or individual CSV files to begin.');

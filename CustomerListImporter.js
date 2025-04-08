@@ -4,74 +4,165 @@
 class CustomerListImporter {
 	constructor() {
 	  this.customerListData = [];
+	  this.userListData = [];
 	}
 	
 	/**
-	 * Parse a CSV or Excel file containing customer data
-	 * @param {File} file - The customer list file (CSV or Excel)
+	 * Parse a ZIP file containing customer and user data
+	 * @param {File} file - The ZIP file
 	 * @returns {Promise} Promise resolving to the parsed data
 	 */
-	parseCustomerListFile(file) {
-	  return new Promise((resolve, reject) => {
-		if (file.name.endsWith('.csv')) {
-		  this.parseCSVFile(file).then(resolve).catch(reject);
-		} else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-		  this.parseExcelFile(file).then(resolve).catch(reject);
-		} else {
-		  reject(new Error('Unsupported file format. Please upload a CSV or Excel file.'));
-		}
-	  });
-	}
-	
-	/**
-	 * Parse a CSV file
-	 * @param {File} file - The CSV file to parse
-	 * @returns {Promise} Promise resolving to the parsed data
-	 */
-	parseCSVFile(file) {
-	  return new Promise((resolve, reject) => {
-		const reader = new FileReader();
-		
-		reader.onload = (event) => {
+	parseZipFile(file) {
+		return new Promise(async (resolve, reject) => {
 		  try {
-			const csvData = event.target.result;
+			// Check if file is a ZIP file
+			if (!file.name.endsWith('.zip')) {
+			  reject(new Error('Please upload a ZIP file containing customer and user data.'));
+			  return;
+			}
 			
-			Papa.parse(csvData, {
-			  header: true,
-			  dynamicTyping: true,
-			  skipEmptyLines: true,
-			  complete: (results) => {
-				this.customerListData = results.data;
-				resolve(results.data);
-			  },
-			  error: (error) => {
-				reject(error);
+			console.log('Starting ZIP processing:', file.name);
+			
+			// Load ZIP file using JSZip
+			const zip = await JSZip.loadAsync(file);
+			console.log('ZIP loaded, files found:', Object.keys(zip.files));
+			
+			let customerFileFound = false;
+			let userFileFound = false;
+			
+			// Process all files in the ZIP
+			const promises = [];
+			
+			// Look for customer and user files
+			Object.keys(zip.files).forEach(filename => {
+			  console.log('Processing file from ZIP:', filename);
+			  // Skip directories
+			  if (zip.files[filename].dir) return;
+			  
+			  // Process CSV files
+			  if (filename.toLowerCase().endsWith('.csv')) {
+				const filePromise = zip.files[filename].async('string').then(content => {
+				  console.log(`Reading file ${filename}, content length: ${content.length}`);
+				  // Output the first 200 chars to see what's in the file
+				  console.log('Content preview:', content.substring(0, 200));
+				  
+				  // Check file type based on content or name
+				  if (filename.toLowerCase() === 'list_customer_user.csv' || 
+					  (content.includes('userID') && content.includes('contactEmail'))) {
+					// This is the user list
+					console.log('Found user file:', filename);
+					this.parseUserCSV(content);
+					userFileFound = true;
+					 //i jsut want to make sure the file doesn't have the __MACOSX folder in it so don't use those files
+				  } else if (!filename.toLowerCase().includes('__macosx')){
+					// Assume this is the customer list
+					console.log('Found customer file:', filename);
+					this.parseCustomerCSV(content);
+					customerFileFound = true;
+				  }
+				});
+				
+				promises.push(filePromise);
 			  }
 			});
+			
+			// Wait for all files to be processed
+			await Promise.all(promises);
+			
+			console.log('All files processed. Customer file found:', customerFileFound, 'User file found:', userFileFound);
+			console.log('Customer data length:', this.customerListData.length);
+			console.log('User data length:', this.userListData.length);
+			
+			// Check if we found both required files
+			if (!customerFileFound) {
+			  reject(new Error('Customer list CSV not found in the ZIP file.'));
+			  return;
+			}
+			
+			if (!userFileFound) {
+			  reject(new Error('User list CSV (list_customer_user.csv) not found in the ZIP file.'));
+			  return;
+			}
+			
+			// Success - both files processed
+			resolve({
+			  customers: this.customerListData,
+			  users: this.userListData
+			});
+			
 		  } catch (error) {
-			reject(error);
+			console.error('ZIP processing error:', error);
+			reject(new Error(`Error processing ZIP file: ${error.message}`));
 		  }
-		};
+		});
+	  }
+	
+	/**
+	 * Parse customer CSV content
+	 * @param {string} csvContent - The CSV content as string
+	 */
+	parseCustomerCSV(csvContent) {
+		try {
+		  const results = Papa.parse(csvContent, {
+			header: true,
+			dynamicTyping: true,
+			skipEmptyLines: true
+		  });
+		  
+		  console.log('Customer CSV parsed:', results);
+		  console.log('Headers:', results.meta.fields);
+		  console.log('First row:', results.data[0]);
+		  
+		  this.customerListData = results.data;
+		} catch (error) {
+		  console.error('Error parsing customer CSV:', error);
+		  throw new Error(`Error parsing customer CSV: ${error.message}`);
+		}
+	  }
+	
+	/**
+	 * Parse user CSV content
+	 * @param {string} csvContent - The CSV content as string
+	 */
+	parseUserCSV(csvContent) {
+	  try {
+		const results = Papa.parse(csvContent, {
+		  header: true,
+		  dynamicTyping: true,
+		  skipEmptyLines: true
+		});
 		
-		reader.onerror = (error) => {
-		  reject(error);
-		};
-		
-		reader.readAsText(file);
-	  });
+		this.userListData = results.data;
+	  } catch (error) {
+		console.error('Error parsing user CSV:', error);
+		throw new Error(`Error parsing user CSV: ${error.message}`);
+	  }
 	}
 	
 	/**
-	 * Parse an Excel file
-	 * @param {File} file - The Excel file to parse
-	 * @returns {Promise} Promise resolving to the parsed data
+	 * Get user email by userID
+	 * @param {number|string} userID - The userID to look up
+	 * @returns {string} Email address or empty string if not found
 	 */
-	parseExcelFile(file) {
-	  return new Promise((resolve, reject) => {
-		// This would require xlsx.js or another Excel parsing library
-		// For now, we'll just show an example implementation
-		reject(new Error('Excel parsing not implemented. Please use CSV format instead.'));
+	getUserEmail(userID) {
+	  if (!userID) return '';
+	  
+	  // Convert userID to number for comparison if it's a numeric string
+	  const numericUserID = typeof userID === 'string' ? 
+		parseInt(userID, 10) : userID;
+	  
+	  // Find the user with matching userID
+	  const user = this.userListData.find(u => {
+		// Handle both numeric and string comparisons
+		if (typeof u.userID === 'number') {
+		  return u.userID === numericUserID;
+		} else {
+		  return u.userID === userID.toString();
+		}
 	  });
+	  
+	  // Return the email if found, otherwise empty string
+	  return user ? (user.contactEmail || '') : '';
 	}
 	
 	/**
@@ -79,35 +170,51 @@ class CustomerListImporter {
 	 * @returns {Array} Array of customer objects in Monarch format
 	 */
 	mapCustomerListToMonarch() {
-	  let custCode = 0;
-	  return this.customerListData.map(customer => {
-		custCode++;
-		// Extract customer data with fallbacks to empty strings
-		const custName = (customer.accountName || '').toString().substring(0, 40);
+		console.log('mapping customer list to monarch');
+		console.log('Customer data:', this.customerListData);
 		
-		// Address information
-		const address1 = (customer.btStreet || '').toString().substring(0, 40);
-		const address2 = (customer.btAddress2 || '').toString().substring(0, 40);
-		const address3 = (customer.btAddress3 || '').toString().substring(0, 40);
-		const city = (customer.btCity || '').toString().substring(0, 40);
-		const state = (customer.btState || '').toString().substring(0, 3);
-		const zip = (customer.btZip || '').toString().substring(0, 10);
-		const country = (customer.btCountry || 'USA').toString().substring(0, 40);
-		
-		// Contact information
-		const phone = (customer.btTelephone || '').toString().substring(0, 20);
-		const fax = (customer.btFax || '').toString().substring(0, 20);
-		
-		// Generate email from available fields
-		let email = '';
-		if (customer.billContactUserID) {
-		  // If there's a billContactUserID, we might use that to find an email
-		  // This is a placeholder - in a real implementation, you would look up the email
-		  email = '';
+		if (!this.customerListData || this.customerListData.length === 0) {
+		  console.error('No customer data found to map');
+		  return [];
 		}
 		
+		// Get the first customer to inspect fields
+		const firstCustomer = this.customerListData[0];
+		console.log('First customer fields:', Object.keys(firstCustomer));
+		
+		let custCode = 0;
+		return this.customerListData.map(customer => {
+		  custCode++;
+		  
+		  // Field mapping - adjust these based on your actual CSV headers
+		  // Example: If your CSV has "Company Name" instead of "accountName"
+		  const custName = (customer.accountName || customer.customerName || customer["Company Name"] || '').toString().substring(0, 40);
+		  
+		  // Address information - adjust field names as needed
+		  const address1 = (customer.btStreet || customer.address1 || customer["Street Address"] || '').toString().substring(0, 40);
+		  const address2 = (customer.btAddress2 || customer.address2 || '').toString().substring(0, 40);
+		  const address3 = (customer.btAddress3 || customer.address3 || '').toString().substring(0, 40);
+		  const city = (customer.btCity || customer.city || customer.City || '').toString().substring(0, 40);
+		  const state = (customer.btState || customer.state || customer.State || '').toString().substring(0, 3);
+		  const zip = (customer.btZip || customer.zip || customer.Zip || '').toString().substring(0, 10);
+		  const country = (customer.btCountry || customer.country || customer.Country || 'USA').toString().substring(0, 40);
+		  
+		  // Contact information
+		  const phone = (customer.btTelephone || customer.phone || customer.Phone || '').toString().substring(0, 20);
+		  const fax = (customer.btFax || customer.fax || customer.Fax || '').toString().substring(0, 20);
+		  
+		  // Get email from user list based on billContactUserID
+		  let email = '';
+		  // Try different field names for user ID
+		  const userId = customer.billContactUserID || customer.userID || customer.userId || customer.user_id;
+		  if (userId) {
+			email = this.getUserEmail(userId);
+			console.log(`Found user ID ${userId}, email: ${email}`);
+		  }
+		
 		// Financial and business information
-		const arTaxCode = (customer.taxItem || '').toString().substring(0, 10);
+		// const arTaxCode = (customer.taxItem || '').toString().substring(0, 10);
+		const arTaxCode = (customer.isTaxable === 'Y' ? 'Taxable' : 'NonTaxable');
 		const termsCode = (customer.btTerms || '').toString().substring(0, 20);
 		const salesAgentId = (customer.salesmanID || '000000000').toString().substring(0, 8);
 		const csrId = (customer.csrID || '000').toString().substring(0, 3);
@@ -205,6 +312,7 @@ class CustomerListImporter {
 	 */
 	generateCustomerImportFile() {
 	  const customers = this.mapCustomerListToMonarch();
+	  console.log('customers', customers);
 	  let result = '';
 	  
 	  customers.forEach(customer => {
@@ -269,14 +377,14 @@ class CustomerListImporter {
 	}
 	
 	/**
-	 * Process customer list file and generate Monarch import file
-	 * @param {File} file - Customer list file
+	 * Process customer list ZIP file and generate Monarch import file
+	 * @param {File} file - Customer list ZIP file
 	 * @returns {Promise} Promise resolving to result object
 	 */
 	async processFile(file) {
 	  try {
 		// Parse the file
-		await this.parseCustomerListFile(file);
+		await this.parseZipFile(file);
 		
 		// Generate and download import file
 		const customerImport = this.generateCustomerImportFile();
@@ -287,7 +395,14 @@ class CustomerListImporter {
 		
 		return {
 		  success: true,
-		  message: 'Customer import file generated successfully!'
+		  message: 'Customer import file generated successfully!',
+		  summary: {
+			customers: this.customerListData.length,
+			users: this.userListData.length,
+			emailsMatched: this.customerListData.filter(c => 
+			  c.billContactUserID && this.getUserEmail(c.billContactUserID)
+			).length
+		  }
 		};
 	  } catch (error) {
 		console.error('Error processing customer list:', error);
@@ -298,6 +413,3 @@ class CustomerListImporter {
 	  }
 	}
   }
-  
-  // Export the class
-  export default CustomerListImporter;

@@ -103,8 +103,8 @@ class MonarchFileViewer {
 	  container.innerHTML = `
 		<h2>File Viewer</h2>
 		<div class="file-selector">
-		  <button id="view-customer-btn" class="viewer-btn">View Customer File</button>
 		  <button id="view-job-btn" class="viewer-btn">View Job File</button>
+		  <button id="view-customer-btn" class="viewer-btn">View Customer File</button>
 		  <div id="file-position-display" class="position-display">Position: <span id="current-position">0</span></div>
 		</div>
 		<div id="viewer-content" class="viewer-content"></div>
@@ -290,5 +290,3 @@ class MonarchFileViewer {
 	  }
 	}
 }
-
-export default MonarchFileViewer;
