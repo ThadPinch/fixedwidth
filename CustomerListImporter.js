@@ -1,6 +1,7 @@
 /**
  * Customer Import specific class for handling the standalone customer list import
  */
+
 class CustomerListImporter {
 	constructor() {
 	  this.customerListData = [];
