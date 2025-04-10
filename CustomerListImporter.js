@@ -227,7 +227,7 @@ class CustomerListImporter {
 				return name;
 			  }
 			}
-			return null; // Return null if no match is found
+			return 'pinch'; // Return pinch if no match is found
 		  }
 		  
 		  // Get the sales agent id from the people array
