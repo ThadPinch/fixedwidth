@@ -213,11 +213,35 @@ class CustomerListImporter {
 			console.log(`Found user ID ${userId}, email: ${email}`);
 		  }
 		
-		// Financial and business information
-		// const arTaxCode = (customer.taxItem || '').toString().substring(0, 10);
-		const arTaxCode = (customer.isTaxable === 'Y' ? 'Taxable' : 'NonTaxable');
-		const termsCode = (customer.btTerms || '').toString().substring(0, 20);
-		const salesAgentId = (customer.salesmanID || '000000000').toString().substring(0, 8);
+
+		  let people = {
+			"hyland": [35],
+			"pinch": [0, 2, 32, 5, 6, 37, 40, 42, 44],
+			"lawhon": [48]
+		  };
+		  
+		  // Function to get the salesman name based on salesmanID
+		  function getSalesmanName(salesmanID) {
+			for (const [name, ids] of Object.entries(people)) {
+			  if (ids.includes(parseInt(salesmanID))) {
+				return name;
+			  }
+			}
+			return null; // Return null if no match is found
+		  }
+		  
+		  // Get the sales agent id from the people array
+		  const arTaxCode = (customer.isTaxable === 'Y' ? 'Taxable' : 'NonTaxable');
+		  const termsCode = (customer.btTerms || '').toString().substring(0, 20);
+		  
+		  // Get the numeric salesmanID
+		  const salesmanIDNum = parseInt(customer.salesmanID || '0');
+		  
+		  // Get the salesman name
+		  const salesmanName = getSalesmanName(salesmanIDNum);
+		  
+		  // Set the salesAgentId - either the name if found, or the original formatted ID
+		  const salesAgentId = salesmanName || (customer.salesmanID || '000000000').toString().substring(0, 8);
 		const csrId = (customer.csrID || '000').toString().substring(0, 3);
 		
 		// Determine PO Required based on available data
