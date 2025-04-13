@@ -231,7 +231,12 @@ class CustomerListImporter {
 		  }
 		  
 		  // Get the sales agent id from the people array
-		  const arTaxCode = (customer.isTaxable === 'Y' ? 'Taxable' : 'NonTaxable');
+		  // do some terms filtering here to maek it so it is their new  values.
+		  // 1=taxable, 3=non taxable
+		//   const arTaxCode = (customer.isTaxable === 'Y' ? 'Taxable' : 'NonTaxable');
+		const arTaxCode = (customer.isTaxable === 'Y' ? '1' : '3');
+		  
+		  // do some terms filtering here to maek it so it is their new  values.
 		  const termsCode = (customer.btTerms || '').toString().substring(0, 20);
 		  
 		  // Get the numeric salesmanID
@@ -242,7 +247,8 @@ class CustomerListImporter {
 		  
 		  // Set the salesAgentId - either the name if found, or the original formatted ID
 		  const salesAgentId = salesmanName || (customer.salesmanID || '000000000').toString().substring(0, 8);
-		const csrId = (customer.csrID || '000').toString().substring(0, 3);
+		// const csrId = (customer.csrID || '000').toString().substring(0, 3);
+		const csrId = '';
 		
 		// Determine PO Required based on available data
 		const poRequired = customer.requirePO === 'Y' ? '1' : '0';
@@ -302,8 +308,10 @@ class CustomerListImporter {
 		  ];
 		
 		// Shipment-Method-ID
-		const shipMethod = shipMethodMap.find(method => method.id === customer.shipMethod);
-		const shipMethodCode = shipMethod ? shipMethod.code : '';
+		// const shipMethod = shipMethodMap.find(method => method.id === customer.shipMethod);
+		// const shipMethodCode = shipMethod ? shipMethod.code : '';
+		const shipMethodCode = '';
+		const shipMethod = '';
 		
 		// Create Monarch fixed-width format mapping
 		return {
@@ -335,7 +343,7 @@ class CustomerListImporter {
 		  'Priority': { value: '', pos: 455, len: 10 },
 		  'Estimate-Markup-Pct': { value: '', pos: 465, len: 6 },
 		  'Overs-Allowed': { value: '', pos: 471, len: 5 },
-		  'Date-First-Order': { value: this.formatDate(new Date()), pos: 476, len: 10 },
+		  'Date-First-Order': { value: '', pos: 476, len: 10 },
 		  'PO-Required': { value: poRequired, pos: 486, len: 1 },
 		  'AR-Stmt': { value: '0', pos: 487, len: 1 },
 		  'AR-Stmt-Dunning-Msg': { value: '0', pos: 488, len: 1 },
@@ -348,17 +356,17 @@ class CustomerListImporter {
 		  'Bank': { value: '', pos: 502, len: 20 },
 		  'Bank-acct-num': { value: '', pos: 522, len: 20 },
 		  'Sales-tax-exempt': { value: '', pos: 542, len: 20 },
-		  'Credit-Limit': { value: '0', pos: 562, len: 14 },
+		  'Credit-Limit': { value: '', pos: 562, len: 14 },
 		  
 		  // Shipping information
-		  'Shipment-Method-ID': { value: shipMethodCode, pos: 576, len: 8 },
+		  'Shipment-Method-ID': { value: '', pos: 576, len: 8 },
 		  'Tax-Number': { value: '', pos: 584, len: 20 },
 		  'Addl-Tax-Number': { value: '', pos: 604, len: 20 },
 		//   'Industry-Code': { value: customer.accountType ? customer.accountType.toString().substring(0, 8) : '', pos: 624, len: 8 },
 		  'Industry-Code': { value: '', pos: 624, len: 8 },
 		  
 		  // Locale and system settings
-		  'Locale-ID': { value: 'en_US', pos: 632, len: 6 },
+		  'Locale-ID': { value: 'USA', pos: 632, len: 6 },
 		  'Prograph-Customer-Type': { value: '', pos: 638, len: 1 },
 		  'Prograph-Shipper': { value: '', pos: 639, len: 1 },
 		  'Prograph-Paper-Owner': { value: '', pos: 640, len: 1 },
