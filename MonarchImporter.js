@@ -157,7 +157,8 @@ class MonarchImporter {
 	
 	/**
 	 * Map CSV data to Monarch jobs format with proper field extraction
-	 * Groups jobs with the same invoice number and assigns consecutive line numbers
+	 * For single line orders, no sub_job_id is assigned
+	 * For multi-line orders with the same job_id, numbered sub_job_ids are assigned
 	 * @returns {Array} Array of job objects in Monarch format
 	 */
 	mapOrdersToMonarch() {
@@ -172,25 +173,28 @@ class MonarchImporter {
 		ordersByInvoice[invoiceNumber].push(order);
 	  });
 	  
-	  // Process each group and create job records with consecutive line numbers
+	  // Process each group and create job records with sub_job_ids only for multi-line orders
 	  const jobs = [];
 	  
 	  Object.entries(ordersByInvoice).forEach(([invoiceNumber, orders]) => {
+		// Determine if this is a multi-line job
+		const isMultiLine = orders.length > 1;
+		
 		orders.forEach((order, index) => {
 		  // Create a job ID from the invoice number
 		  let jobId = '';
-		  if (invoiceNumber) {
-			jobId = invoiceNumber.toString().padStart(8, '0').substring(0, 8);
-		  } else {
-			// Generate a unique ID if invoice number is missing
-			jobId = (`JOB${jobs.length + 1}`).padStart(8, '0').substring(0, 8);
-		  }
+		  jobId = invoiceNumber.toString().padEnd(8, ' ').substring(0, 8);
 		  
 		  // Clean up jobId by replacing leading zeros with spaces
 		  jobId = jobId.replace(/^0+/, match => ' '.repeat(match.length));
 		  
-		  // Create sub-job ID (line number) - 1-based indexing
-		  const subJobId = (index + 1).toString().padStart(4, ' ');
+		  // Create sub_job_id based on whether this is a multi-line job
+		  let subJobId = '    '; // Default to 4 spaces (blank)
+		  
+		  if (isMultiLine) {
+			// Only assign numbers for multi-line jobs - 1-based indexing
+			subJobId = (index + 1).toString().padEnd(4, ' ').substring(0, 4);
+		  }
 		  
 		  // Parse dates from order data
 		  const dueDate = order['Due date'] ? this.formatDate(new Date(order['Due date'])) : '';
@@ -210,7 +214,7 @@ class MonarchImporter {
 		  
 		  // Format numeric values
 		  const qtyOrdered = order['Line: Quantity'] ? 
-			parseFloat(order['Line: Quantity']).toFixed(2).toString() : 
+			parseFloat(order['Line: Quantity']).toFixed(0).toString() : 
 			'0.00';
 		  
 		  const unitPrice = order['Line: Unit price'] ? 
@@ -226,7 +230,7 @@ class MonarchImporter {
 			'job_id': { value: jobId, pos: 1, len: 8 },
 			'sub_job_id': { value: subJobId, pos: 9, len: 4 },
 			'job_description': { value: productName.substring(0, 254), pos: 13, len: 254 },
-			'job_type': { value: 'FG', pos: 267, len: 19 }, // Default to Finished Goods
+			'job_type': { value: 'Production', pos: 267, len: 19 }, // Default to Finished Goods
 			'item_id': { value: '', pos: 286, len: 15 },
 			'cust_ordered_by': { value: customerId.substring(0, 8), pos: 301, len: 8 },
 			'cust_billed_to': { value: customerId.substring(0, 8), pos: 309, len: 8 },
@@ -238,7 +242,7 @@ class MonarchImporter {
 			'priority': { value: '', pos: 376, len: 10 }, 
 			'contact_name': { value: contactName.substring(0, 30), pos: 386, len: 30 },
 			'expense_code': { value: '', pos: 416, len: 24 },
-			'shop_floor_active': { value: '1', pos: 440, len: 1 },
+			'shop_floor_active': { value: '0', pos: 440, len: 1 },
 			'form_number': { value: '', pos: 441, len: 20 },
 			'quotation_amount': { value: '', pos: 461, len: 15 },
 			'unit_of_measure_id': { value: 'EA', pos: 476, len: 4 }, // Default to Each
@@ -373,4 +377,3 @@ class MonarchImporter {
 	  }
 	}
   }
-  

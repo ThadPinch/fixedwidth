@@ -183,7 +183,7 @@ class CustomerListImporter {
 		const firstCustomer = this.customerListData[0];
 		console.log('First customer fields:', Object.keys(firstCustomer));
 		
-		let custCode = 0;
+		let custCode = 5391;
 		return this.customerListData.map(customer => {
 		  custCode++;
 		  
@@ -237,7 +237,34 @@ class CustomerListImporter {
 		const arTaxCode = (customer.isTaxable === 'Y' ? '1' : '3');
 		  
 		  // do some terms filtering here to maek it so it is their new  values.
-		  const termsCode = (customer.btTerms || '').toString().substring(0, 20);
+		//   const termsCode = (customer.btTerms || '').toString().substring(0, 20);
+		let termsCode = '';
+		switch(customer.btTerms){
+			case 'Prepaid':
+				termsCode = 'Prepay';
+				break;
+			case 'Net 15':
+				termsCode = 'Net 15';
+				break;
+			case 'Net 30':
+				termsCode = 'Net 30';
+				break;
+			case '2% 10 Net30':
+				termsCode = '2%-10 days, Net 30';
+				break;
+			case 'Net 60':
+				termsCode = 'Net 60';
+				break;
+			case 'COD':
+				termsCode = 'Cash on Delivery';
+				break;
+			case 'Credit Card':
+				termsCode = 'Credit Card On File';
+				break;
+			case 'Net 10':
+				termsCode = 'Net 10 Days';
+				
+		}
 		  
 		  // Get the numeric salesmanID
 		  const salesmanIDNum = parseInt(customer.salesmanID || '0');
@@ -362,7 +389,6 @@ class CustomerListImporter {
 		  'Shipment-Method-ID': { value: '', pos: 576, len: 8 },
 		  'Tax-Number': { value: '', pos: 584, len: 20 },
 		  'Addl-Tax-Number': { value: '', pos: 604, len: 20 },
-		//   'Industry-Code': { value: customer.accountType ? customer.accountType.toString().substring(0, 8) : '', pos: 624, len: 8 },
 		  'Industry-Code': { value: '', pos: 624, len: 8 },
 		  
 		  // Locale and system settings

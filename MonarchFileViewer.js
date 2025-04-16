@@ -88,7 +88,8 @@ class MonarchFileViewer {
 		  { name: 'quotation_amount', pos: 461, len: 15, color: '#ccffe0' },
 		  { name: 'unit_of_measure_id', pos: 476, len: 4, color: '#ffd9cc' },
 		  { name: 'unit_price', pos: 480, len: 16, color: '#d9ffcc' },
-		  { name: 'job_title', pos: 496, len: 50, color: '#ffcce6' }
+		  { name: 'job_title', pos: 496, len: 50, color: '#ffcce6' },
+		  { name: 'forest_type_id', pos: 546, len: 15, color: '#ffd9cc' }
 		]
 	  };
 	}
