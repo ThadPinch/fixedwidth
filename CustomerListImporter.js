@@ -183,7 +183,7 @@ class CustomerListImporter {
 		const firstCustomer = this.customerListData[0];
 		console.log('First customer fields:', Object.keys(firstCustomer));
 		
-		let custCode = 5391;
+		let custCode = 9999;
 		return this.customerListData.map(customer => {
 		  custCode++;
 		  
