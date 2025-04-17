@@ -244,26 +244,29 @@ class CustomerListImporter {
 				termsCode = 'Prepay';
 				break;
 			case 'Net 15':
-				termsCode = 'Net 15';
+				termsCode = '15';
 				break;
 			case 'Net 30':
-				termsCode = 'Net 30';
+				termsCode = '30';
 				break;
 			case '2% 10 Net30':
-				termsCode = '2%-10 days, Net 30';
+				termsCode = '5';
 				break;
 			case 'Net 60':
-				termsCode = 'Net 60';
+				termsCode = '60';
 				break;
 			case 'COD':
-				termsCode = 'Cash on Delivery';
+				termsCode = 'COD';
 				break;
 			case 'Credit Card':
-				termsCode = 'Credit Card On File';
+				termsCode = 'CC';
 				break;
 			case 'Net 10':
-				termsCode = 'Net 10 Days';
-				
+				termsCode = 'NET 10';
+				break;
+			case 'Unspecified':
+				termsCode = '0';
+				break;
 		}
 		  
 		  // Get the numeric salesmanID

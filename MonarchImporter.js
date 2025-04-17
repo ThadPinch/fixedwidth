@@ -234,7 +234,7 @@ class MonarchImporter {
 			'item_id': { value: '', pos: 286, len: 15 },
 			'cust_ordered_by': { value: customerId.substring(0, 8), pos: 301, len: 8 },
 			'cust_billed_to': { value: customerId.substring(0, 8), pos: 309, len: 8 },
-			'sales_class_id': { value: '', pos: 317, len: 8 },
+			'sales_class_id': { value: '113', pos: 317, len: 8 },
 			'po_number': { value: poNumber.substring(0, 20), pos: 325, len: 20 },
 			'date_promised': { value: dueDate, pos: 345, len: 10 },
 			'ship_date': { value: shipDate, pos: 355, len: 10 },
@@ -245,7 +245,7 @@ class MonarchImporter {
 			'shop_floor_active': { value: '0', pos: 440, len: 1 },
 			'form_number': { value: '', pos: 441, len: 20 },
 			'quotation_amount': { value: '', pos: 461, len: 15 },
-			'unit_of_measure_id': { value: 'EA', pos: 476, len: 4 }, // Default to Each
+			'unit_of_measure_id': { value: 'Each', pos: 476, len: 4 }, // Default to Each
 			'unit_price': { value: unitPrice, pos: 480, len: 16 },
 			'job_title': { value: productName.substring(0, 50), pos: 496, len: 50 },
 			'forest_type_id': { value: '', pos: 546, len: 15 },
