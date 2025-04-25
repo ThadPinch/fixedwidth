@@ -9,6 +9,7 @@ class MonarchImporter {
 	  this.customerData = [];
 	  this.orderData = [];
 	  this.paymentData = [];
+	  this.rejectedOrders = []; // New array to track rejected orders
 	}
   
 	/**
@@ -157,10 +158,13 @@ class MonarchImporter {
 	
 	/**
 	 * Map CSV data to Monarch jobs format with proper field extraction
-	 * Separates main orders and sub-jobs into different arrays
-	 * @returns {Promise<Object>} Object containing mainJobs and subJobs arrays in Monarch format
+	 * Separates main orders and sub-jobs into different arrays and tracks rejected orders
+	 * @returns {Promise<Object>} Object containing mainJobs, subJobs, and rejectedOrders arrays in Monarch format
 	 */
 	async mapOrdersToMonarch() {
+	  // Reset rejected orders array
+	  this.rejectedOrders = [];
+	  
 	  // Create an instance of the API service
 	  const customerApiService = new CustomerApiService();
 	  
@@ -203,25 +207,65 @@ class MonarchImporter {
 		// Get the customer data that matches this order
 		const customerName = firstOrder['Customer Name'] || '';
 		
-		// Try to find the customer in the API by name
-		let monarchCustomerId = '';
-		try {
-		  const searchResults = await customerApiService.searchCustomers(customerName);
-		  if (searchResults && searchResults.length > 0) {
-			// Use the first matching customer
-			monarchCustomerId = searchResults[0].customer_id;
-		  } else {
-			console.warn(`No monarch customer found for ${customerName}`);
-		  }
-		} catch (error) {
-		  console.error(`Error fetching monarch customer for ${customerName}:`, error);
-		}
-		
-		// Fall back to local customer data if API call fails
-		if (!monarchCustomerId) {
-		  const customerRecord = this.customerData.find(c => c['Customer ID'] === customerName);
-		  monarchCustomerId = customerRecord ? customerRecord['Customer ID'] : '';
-		}
+	// Try to find the customer in the API by name
+let monarchCustomerId = '';
+let customerFound = false;
+
+try {
+  console.log(`Searching for customer: ${customerName}`);
+  const searchResults = await customerApiService.searchCustomers(customerName);
+  
+  // Log the search results for debugging
+  console.log('API search results:', searchResults);
+  
+  if (searchResults && Array.isArray(searchResults) && searchResults.length > 0) {
+    // Use the first matching customer
+    monarchCustomerId = searchResults[0].customer_id;
+    console.log(`Customer found in API: ${monarchCustomerId}`);
+    customerFound = true;
+  } else {
+    console.warn(`No monarch customer found for ${customerName}`);
+    
+    // Add to rejected orders
+    const rejectedOrder = {
+      invoiceNumber: invoiceNumber,
+      customerName: customerName,
+      productName: firstOrder['Line: Product Name'] || '',
+      poNumber: poNumber,
+      dueDate: dueDate,
+      amount: firstOrder['Line: Amount'] || '',
+      reason: 'Customer not found in Monarch database'
+    };
+    
+    this.rejectedOrders.push(rejectedOrder);
+    console.log(`Added to rejected orders: ${customerName}, Invoice: ${invoiceNumber}`);
+    
+    // Skip processing this order and continue with the next
+    continue;
+  }
+} catch (error) {
+  console.error(`Error fetching monarch customer for ${customerName}:`, error);
+  
+  // Add to rejected orders when API error occurs
+  const rejectedOrder = {
+    invoiceNumber: invoiceNumber,
+    customerName: customerName,
+    productName: firstOrder['Line: Product Name'] || '',
+    poNumber: poNumber,
+    dueDate: dueDate,
+    amount: firstOrder['Line: Amount'] || '',
+    reason: `API Error: ${error.message}`
+  };
+  
+  this.rejectedOrders.push(rejectedOrder);
+  console.log(`Added to rejected orders due to API error: ${customerName}, Invoice: ${invoiceNumber}`);
+  
+  // Skip processing this order and continue with the next
+  continue;
+}
+
+// We no longer want to fall back to local data if API call fails
+// The full rejection tracking approach should be used instead
 		
 		// Ensure the customer ID is valid (max 8 chars)
 		monarchCustomerId = monarchCustomerId.toString().substring(0, 8);
@@ -329,7 +373,7 @@ class MonarchImporter {
 		}
 	  }
 	  
-	  return { mainJobs, subJobs };
+	  return { mainJobs, subJobs, rejectedOrders: this.rejectedOrders };
 	}
 	  
 	/**
@@ -387,13 +431,60 @@ class MonarchImporter {
 	  
 	  return result;
 	}
+	
+	/**
+	 * Generate rejection file for orders with customers not found in API
+	 * @returns {string} CSV formatted rejection file content
+	 */
+	generateRejectionFile() {
+	  if (this.rejectedOrders.length === 0) {
+		return "No rejected orders.";
+	  }
+	  
+	  // Create headers for the CSV
+	  const headers = [
+		"Invoice Number",
+		"Customer Name",
+		"Product",
+		"PO Number",
+		"Due Date",
+		"Amount",
+		"Rejection Reason"
+	  ];
+	  
+	  // Create CSV content
+	  let csvContent = headers.join(",") + "\n";
+	  
+	  // Add each rejected order as a row
+	  this.rejectedOrders.forEach(order => {
+		// Escape fields that might contain commas
+		const escapedCustomerName = `"${order.customerName.replace(/"/g, '""')}"`;
+		const escapedProductName = `"${order.productName.replace(/"/g, '""')}"`;
+		const escapedPoNumber = `"${order.poNumber.replace(/"/g, '""')}"`;
+		const escapedReason = `"${order.reason.replace(/"/g, '""')}"`;
+		
+		const row = [
+		  order.invoiceNumber,
+		  escapedCustomerName,
+		  escapedProductName,
+		  escapedPoNumber,
+		  order.dueDate,
+		  order.amount,
+		  escapedReason
+		];
+		
+		csvContent += row.join(",") + "\n";
+	  });
+	  
+	  return csvContent;
+	}
 	  
 	/**
 	 * Generate two separate job import files - one for main jobs and one for sub-jobs
 	 * @returns {Promise<Object>} Object containing mainJobsFile and subJobsFile content
 	 */
 	async generateJobImportFiles() {
-	  const { mainJobs, subJobs } = await this.mapOrdersToMonarch();
+	  const { mainJobs, subJobs, rejectedOrders } = await this.mapOrdersToMonarch();
 	  
 	  // Generate main jobs file (with blank sub_job_id)
 	  const mainJobsFile = this.generateFixedWidthFile(mainJobs);
@@ -401,7 +492,10 @@ class MonarchImporter {
 	  // Generate sub-jobs file (with numbered sub_job_id)
 	  const subJobsFile = this.generateFixedWidthFile(subJobs);
 	  
-	  return { mainJobsFile, subJobsFile };
+	  // Generate rejection file
+	  const rejectionFile = this.generateRejectionFile();
+	  
+	  return { mainJobsFile, subJobsFile, rejectionFile };
 	}
 	  
 	/**
@@ -448,19 +542,31 @@ class MonarchImporter {
 		await Promise.all(promises);
 		
 		// Generate job import files - note this is now async
-		const { mainJobsFile, subJobsFile } = await this.generateJobImportFiles();
+		const { mainJobsFile, subJobsFile, rejectionFile } = await this.generateJobImportFiles();
 		
 		// Download the job files
 		this.downloadTextFile(mainJobsFile, 'monarch_main_jobs.txt');
 		this.downloadTextFile(subJobsFile, 'monarch_sub_jobs.txt');
 		
+		// Download rejection file if there are any rejected orders
+		if (this.rejectedOrders.length > 0) {
+		  this.downloadTextFile(rejectionFile, 'monarch_rejected_orders.txt');
+		}
+		
 		// Store in localStorage for the viewer (combine both for backwards compatibility)
 		const combinedFile = mainJobsFile + subJobsFile;
 		localStorage.setItem('monarch_job_import', combinedFile);
 		
+		// Create result message that includes rejection information
+		let message = 'Monarch job import files generated successfully!';
+		if (this.rejectedOrders.length > 0) {
+		  message += ` ${this.rejectedOrders.length} orders were rejected due to missing customer data.`;
+		}
+		
 		return {
 		  success: true,
-		  message: 'Monarch job import files generated successfully!'
+		  message: message,
+		  rejectedCount: this.rejectedOrders.length
 		};
 	  } catch (error) {
 		console.error('Error processing files:', error);

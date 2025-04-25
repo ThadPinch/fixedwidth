@@ -4,9 +4,10 @@
 
 class CustomerListImporter {
 	constructor() {
-	  this.customerListData = [];
-	  this.userListData = [];
-	}
+		this.customerListData = [];
+		this.userListData = [];
+		this.customerIdStart = 10000; // Default starting value
+	  }
 	
 	/**
 	 * Parse a ZIP file containing customer and user data
@@ -180,6 +181,21 @@ class CustomerListImporter {
 	}
 	
 	/**
+   * Set the starting customer ID
+   * @param {number} startId - The starting customer ID number
+   */
+	setCustomerIdStart(startId) {
+		// Ensure it's a valid number and convert to integer
+		const numValue = parseInt(startId, 10);
+		if (!isNaN(numValue) && numValue > 0) {
+		  this.customerIdStart = numValue;
+		  console.log(`Customer ID start set to: ${this.customerIdStart}`);
+		} else {
+		  console.warn(`Invalid customer ID start value: ${startId}, using default: ${this.customerIdStart}`);
+		}
+	  }
+	
+	/**
 	 * Map customer list data to Monarch format
 	 * @returns {Array} Array of customer objects in Monarch format
 	 */
@@ -196,7 +212,9 @@ class CustomerListImporter {
 		const firstCustomer = this.customerListData[0];
 		console.log('First customer fields:', Object.keys(firstCustomer));
 		
-		let custCode = 9999;
+		// Start with the configured customer ID
+		let custCode = this.customerIdStart - 1;
+		
 		return this.customerListData.map(customer => {
 		  custCode++;
 		  

@@ -301,3 +301,28 @@ body {
 	font-size: 9px;
 	color: #999;
   }
+
+  .customer-options {
+	margin: 15px 0;
+	padding: 10px;
+	background-color: #f5f5f5;
+	border-radius: 5px;
+  }
+  
+  .option {
+	display: flex;
+	align-items: center;
+	margin-bottom: 5px;
+  }
+  
+  .option label {
+	width: 150px;
+	font-weight: bold;
+  }
+  
+  .number-input {
+	padding: 5px;
+	width: 100px;
+	border: 1px solid #ccc;
+	border-radius: 3px;
+  }

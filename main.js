@@ -253,6 +253,14 @@ function processCustomerFile() {
     // to avoid conflicts with any stored data
     const importer = new CustomerListImporter();
     
+    // Get the customer ID start value from the input field
+    const customerIdStartInput = document.getElementById('customer-id-start');
+    const customerIdStart = customerIdStartInput.value;
+    
+    // Set the customer ID start value
+    importer.setCustomerIdStart(customerIdStart);
+    logMessage(`Using Customer ID start: ${customerIdStart}`);
+    
     importer.processFile(customerListFile)
       .then(result => {
         if (result.success) {

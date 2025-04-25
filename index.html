@@ -6,7 +6,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
   <link rel="stylesheet" href="styles.css">
-  <script src="CustomerApiService.js"></script>
+  <!-- Use regular scripts instead of modules -->
   <script src="MonarchFileViewer.js"></script>
   <script src="CustomerListImporter.js"></script>
   <script src="MonarchImporter.js"></script>
@@ -83,6 +83,7 @@
         <div>
           <ol>
             <li>Upload ZIP file containing customer data and list_customer_user.csv</li>
+            <li>Set the starting Customer ID number (optional)</li>
             <li>Click "Generate Customer Import File"</li>
             <li>Click "View Customer File"</li>
           </ol>
@@ -91,6 +92,13 @@
         <div id="customer-list-dropzone" class="dropzone">
           <p>Drag & drop your ZIP file containing customer and user data, or click to browse</p>
           <input type="file" id="customer-list-file" accept=".zip" style="display: none">
+        </div>
+      </div>
+      
+      <div class="customer-options">
+        <div class="option">
+          <label for="customer-id-start">Customer ID Start #:</label>
+          <input type="number" id="customer-id-start" min="1000" value="10000" class="number-input">
         </div>
       </div>
       
