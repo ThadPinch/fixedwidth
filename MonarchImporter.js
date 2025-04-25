@@ -158,9 +158,12 @@ class MonarchImporter {
 	/**
 	 * Map CSV data to Monarch jobs format with proper field extraction
 	 * Separates main orders and sub-jobs into different arrays
-	 * @returns {Object} Object containing mainJobs and subJobs arrays in Monarch format
+	 * @returns {Promise<Object>} Object containing mainJobs and subJobs arrays in Monarch format
 	 */
-	mapOrdersToMonarch() {
+	async mapOrdersToMonarch() {
+	  // Create an instance of the API service
+	  const customerApiService = new CustomerApiService();
+	  
 	  // First, group orders by invoice number
 	  const ordersByInvoice = {};
 	  
@@ -176,8 +179,9 @@ class MonarchImporter {
 	  const mainJobs = [];
 	  const subJobs = [];
 	  
-	  Object.entries(ordersByInvoice).forEach(([invoiceNumber, orders]) => {
-		if (orders.length === 0) return;
+	  // Process each invoice
+	  for (const [invoiceNumber, orders] of Object.entries(ordersByInvoice)) {
+		if (orders.length === 0) continue;
 		
 		// Create a job ID from the invoice number
 		let jobId = '';
@@ -197,12 +201,34 @@ class MonarchImporter {
 		const poNumber = firstOrder['Custom Field 1-po#'] || '';
 		
 		// Get the customer data that matches this order
-		const customerRecord = this.customerData.find(c => c['Customer ID'] === firstOrder['Customer Name']);
-		const customerId = customerRecord ? customerRecord['Customer ID'] : '';
+		const customerName = firstOrder['Customer Name'] || '';
+		
+		// Try to find the customer in the API by name
+		let monarchCustomerId = '';
+		try {
+		  const searchResults = await customerApiService.searchCustomers(customerName);
+		  if (searchResults && searchResults.length > 0) {
+			// Use the first matching customer
+			monarchCustomerId = searchResults[0].customer_id;
+		  } else {
+			console.warn(`No monarch customer found for ${customerName}`);
+		  }
+		} catch (error) {
+		  console.error(`Error fetching monarch customer for ${customerName}:`, error);
+		}
+		
+		// Fall back to local customer data if API call fails
+		if (!monarchCustomerId) {
+		  const customerRecord = this.customerData.find(c => c['Customer ID'] === customerName);
+		  monarchCustomerId = customerRecord ? customerRecord['Customer ID'] : '';
+		}
+		
+		// Ensure the customer ID is valid (max 8 chars)
+		monarchCustomerId = monarchCustomerId.toString().substring(0, 8);
 		
 		// Contact name from customer record
-		const contactName = customerRecord ? 
-		  `${customerRecord['Bill to Contact First Name'] || ''} ${customerRecord['Bill to Contact Last Name'] || ''}`.trim() : 
+		const contactName = this.customerData.find(c => c['Customer ID'] === customerName) ? 
+		  `${this.customerData.find(c => c['Customer ID'] === customerName)['Bill to Contact First Name'] || ''} ${this.customerData.find(c => c['Customer ID'] === customerName)['Bill to Contact Last Name'] || ''}`.trim() : 
 		  '';
 		
 		// Format numeric values
@@ -217,9 +243,8 @@ class MonarchImporter {
 		// Clean product description
 		const rawProductName = firstOrder['Line: Product Name'] || '';
 		const productName = this.cleanProductDescription(rawProductName);
-
-		// new variable for quotation amount needed, its just the Total tax + Shipping amount + Line: Amount
-		// just line amount actually
+  
+		// Calculate quotation amount
 		let quotationAmount = firstOrder['Line: Amount'] ? 
 		  parseFloat(firstOrder['Line: Amount']).toFixed(2).toString() : 
 		  '0.00';
@@ -231,8 +256,8 @@ class MonarchImporter {
 		  'job_description': { value: productName.substring(0, 254), pos: 13, len: 254 },
 		  'job_type': { value: 'Production', pos: 267, len: 19 }, // Default to Finished Goods
 		  'item_id': { value: '', pos: 286, len: 15 },
-		  'cust_ordered_by': { value: customerId.substring(0, 8), pos: 301, len: 8 },
-		  'cust_billed_to': { value: customerId.substring(0, 8), pos: 309, len: 8 },
+		  'cust_ordered_by': { value: monarchCustomerId, pos: 301, len: 8 },
+		  'cust_billed_to': { value: monarchCustomerId, pos: 309, len: 8 },
 		  'sales_class_id': { value: '113', pos: 317, len: 8 },
 		  'po_number': { value: poNumber.substring(0, 20), pos: 325, len: 20 },
 		  'date_promised': { value: dueDate, pos: 345, len: 10 },
@@ -269,22 +294,21 @@ class MonarchImporter {
 			
 			const orderRawProductName = order['Line: Product Name'] || '';
 			const orderProductName = this.cleanProductDescription(orderRawProductName);
-
-			// do the quotation amount again
-			//just the line amount actually
+  
+			// Calculate quotation amount for sub-job
 			let quotationAmount = order['Line: Amount'] ? 
 			  parseFloat(order['Line: Amount']).toFixed(2).toString() : 
 			  '0.00';
 			
-			// Map sub-job to Monarch format
+			// Map sub-job to Monarch format with the same customer ID
 			subJobs.push({
 			  'job_id': { value: jobId, pos: 1, len: 8 },
 			  'sub_job_id': { value: subJobId, pos: 9, len: 4 }, // Numbered for sub-jobs
 			  'job_description': { value: orderProductName.substring(0, 254), pos: 13, len: 254 },
 			  'job_type': { value: 'Production', pos: 267, len: 19 },
 			  'item_id': { value: '', pos: 286, len: 15 },
-			  'cust_ordered_by': { value: customerId.substring(0, 8), pos: 301, len: 8 },
-			  'cust_billed_to': { value: customerId.substring(0, 8), pos: 309, len: 8 },
+			  'cust_ordered_by': { value: monarchCustomerId, pos: 301, len: 8 },
+			  'cust_billed_to': { value: monarchCustomerId, pos: 309, len: 8 },
 			  'sales_class_id': { value: '113', pos: 317, len: 8 },
 			  'po_number': { value: poNumber.substring(0, 20), pos: 325, len: 20 },
 			  'date_promised': { value: dueDate, pos: 345, len: 10 },
@@ -303,7 +327,7 @@ class MonarchImporter {
 			});
 		  }
 		}
-	  });
+	  }
 	  
 	  return { mainJobs, subJobs };
 	}
@@ -366,10 +390,10 @@ class MonarchImporter {
 	  
 	/**
 	 * Generate two separate job import files - one for main jobs and one for sub-jobs
-	 * @returns {Object} Object containing mainJobsFile and subJobsFile content
+	 * @returns {Promise<Object>} Object containing mainJobsFile and subJobsFile content
 	 */
-	generateJobImportFiles() {
-	  const { mainJobs, subJobs } = this.mapOrdersToMonarch();
+	async generateJobImportFiles() {
+	  const { mainJobs, subJobs } = await this.mapOrdersToMonarch();
 	  
 	  // Generate main jobs file (with blank sub_job_id)
 	  const mainJobsFile = this.generateFixedWidthFile(mainJobs);
@@ -423,8 +447,8 @@ class MonarchImporter {
 		
 		await Promise.all(promises);
 		
-		// Generate job import files
-		const { mainJobsFile, subJobsFile } = this.generateJobImportFiles();
+		// Generate job import files - note this is now async
+		const { mainJobsFile, subJobsFile } = await this.generateJobImportFiles();
 		
 		// Download the job files
 		this.downloadTextFile(mainJobsFile, 'monarch_main_jobs.txt');

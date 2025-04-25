@@ -1,4 +1,3 @@
-
 // Main application code
 document.addEventListener('DOMContentLoaded', function() {
   // Clear the local storage
@@ -230,138 +229,138 @@ customerListFileInput.setAttribute('accept', '.zip');
     customerListFileInput.click();
   });
   
-  // Update customer list input change handler
-  customerListFileInput.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-      const file = e.target.files[0];
-      if (file.name.endsWith('.zip')) {
-        customerListFile = file;
-        updateCustomerListStatus(true);
-        logMessage(`Customer ZIP file selected: ${file.name}`);
-      } else {
-        logMessage('Please select a ZIP file containing customer and user data.', 'error');
-        updateCustomerListStatus(false);
-      }
-    }
-  });
-  
-  // Update process customer file function
-  function processCustomerFile() {
-    if (customerListFile) {
-      logMessage('Processing customer ZIP file...');
-      
-      // Create an instance of CustomerListImporter for each operation
-      // to avoid conflicts with any stored data
-      const importer = new CustomerListImporter();
-      
-      importer.processFile(customerListFile)
-        .then(result => {
-          if (result.success) {
-            const summary = result.summary || {};
-            logMessage(result.message, 'success');
-            
-            // Add a summary of the import
-            if (summary.customers && summary.users) {
-              logMessage(`Processed ${summary.customers} customers and ${summary.users} users.`, 'info');
-              
-              if (summary.emailsMatched !== undefined) {
-                logMessage(`Found email addresses for ${summary.emailsMatched} customers.`, 'info');
-              }
-            }
-            
-            // Load the file in the viewer
-            fileViewer.loadFile('customer');
-          } else {
-            logMessage(result.message, 'error');
-          }
-        })
-        .catch(error => {
-          logMessage(`Error: ${error.message}`, 'error');
-        });
+// Update customer list input change handler
+customerListFileInput.addEventListener('change', (e) => {
+  if (e.target.files.length > 0) {
+    const file = e.target.files[0];
+    if (file.name.endsWith('.zip')) {
+      customerListFile = file;
+      updateCustomerListStatus(true);
+      logMessage(`Customer ZIP file selected: ${file.name}`);
     } else {
-      logMessage('No customer ZIP file selected.', 'error');
+      logMessage('Please select a ZIP file containing customer and user data.', 'error');
+      updateCustomerListStatus(false);
     }
   }
+});
 
-  /**
-   * Process job files
-   */
-  function processJobFiles() {
-    if (files.customer && files.order) {
-      logMessage('Processing job files...');
-      fileViewer.loadFile('job');
-      monarchImporter.processFiles(files)
-        .then(result => {
-          if (result.success) {
-            logMessage(result.message, 'success');
-          } else {
-            logMessage(result.message, 'error');
-          }
-        })
-        .catch(error => {
-          logMessage(`Error: ${error.message}`, 'error');
-        });
-    }
-  }
-  
-  // Individual file uploads
-  customerFileInput.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-      files.customer = e.target.files[0];
-      updateFileStatus('customer', true);
-      logMessage(`Customer file selected: ${files.customer.name}`);
-    }
-  });
-  
-  orderFileInput.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-      files.order = e.target.files[0];
-      updateFileStatus('order', true);
-      logMessage(`Order file selected: ${files.order.name}`);
-    }
-  });
-  
-  paymentFileInput.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-      files.payment = e.target.files[0];
-      updateFileStatus('payment', true);
-      logMessage(`Payment file selected: ${files.payment.name}`);
-    }
-  });
-  
-  // Generate job import file
-  generateJobBtn.addEventListener('click', async () => {
-    if (!files.customer || !files.order) {
-      logMessage('Missing required files. Need at least Customer and Order data.', 'error');
-      return;
-    }
+// Update process customer file function
+function processCustomerFile() {
+  if (customerListFile) {
+    logMessage('Processing customer ZIP file...');
     
-    logMessage('Generating Monarch job import file...');
+    // Create an instance of CustomerListImporter for each operation
+    // to avoid conflicts with any stored data
+    const importer = new CustomerListImporter();
+    
+    importer.processFile(customerListFile)
+      .then(result => {
+        if (result.success) {
+          const summary = result.summary || {};
+          logMessage(result.message, 'success');
+          
+          // Add a summary of the import
+          if (summary.customers && summary.users) {
+            logMessage(`Processed ${summary.customers} customers and ${summary.users} users.`, 'info');
+            
+            if (summary.emailsMatched !== undefined) {
+              logMessage(`Found email addresses for ${summary.emailsMatched} customers.`, 'info');
+            }
+          }
+          
+          // Load the file in the viewer
+          fileViewer.loadFile('customer');
+        } else {
+          logMessage(result.message, 'error');
+        }
+      })
+      .catch(error => {
+        logMessage(`Error: ${error.message}`, 'error');
+      });
+  } else {
+    logMessage('No customer ZIP file selected.', 'error');
+  }
+}
+
+/**
+ * Process job files
+ */
+async function processJobFiles() {
+  if (files.customer && files.order) {
+    logMessage('Processing job files...');
+    fileViewer.loadFile('job');
     
     try {
       const result = await monarchImporter.processFiles(files);
-      
       if (result.success) {
         logMessage(result.message, 'success');
-        fileViewer.loadFile('job');
       } else {
         logMessage(result.message, 'error');
       }
     } catch (error) {
       logMessage(`Error: ${error.message}`, 'error');
     }
-  });
-  
-   // Update the generate button click handler
-   generateCustomerBtn.addEventListener('click', () => {
-    if (!customerListFile) {
-      logMessage('No customer ZIP file selected.', 'error');
-      return;
-    }
-    
-    logMessage('Generating Monarch customer import file...');
-    processCustomerFile();
-  });
+  }
+}
 
-  logMessage('Ready to process files. Upload ZIP or individual CSV files to begin.');
+// Individual file uploads
+customerFileInput.addEventListener('change', (e) => {
+  if (e.target.files.length > 0) {
+    files.customer = e.target.files[0];
+    updateFileStatus('customer', true);
+    logMessage(`Customer file selected: ${files.customer.name}`);
+  }
+});
+
+orderFileInput.addEventListener('change', (e) => {
+  if (e.target.files.length > 0) {
+    files.order = e.target.files[0];
+    updateFileStatus('order', true);
+    logMessage(`Order file selected: ${files.order.name}`);
+  }
+});
+
+paymentFileInput.addEventListener('change', (e) => {
+  if (e.target.files.length > 0) {
+    files.payment = e.target.files[0];
+    updateFileStatus('payment', true);
+    logMessage(`Payment file selected: ${files.payment.name}`);
+  }
+});
+
+// Generate job import file
+generateJobBtn.addEventListener('click', async () => {
+  if (!files.customer || !files.order) {
+    logMessage('Missing required files. Need at least Customer and Order data.', 'error');
+    return;
+  }
+  
+  logMessage('Generating Monarch job import file...');
+  
+  try {
+    const result = await monarchImporter.processFiles(files);
+    
+    if (result.success) {
+      logMessage(result.message, 'success');
+      fileViewer.loadFile('job');
+    } else {
+      logMessage(result.message, 'error');
+    }
+  } catch (error) {
+    logMessage(`Error: ${error.message}`, 'error');
+  }
+});
+
+ // Update the generate button click handler
+ generateCustomerBtn.addEventListener('click', () => {
+  if (!customerListFile) {
+    logMessage('No customer ZIP file selected.', 'error');
+    return;
+  }
+  
+  logMessage('Generating Monarch customer import file...');
+  processCustomerFile();
+});
+
+logMessage('Ready to process files. Upload ZIP or individual CSV files to begin.');
 });
