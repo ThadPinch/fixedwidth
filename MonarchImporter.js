@@ -219,7 +219,10 @@ class MonarchImporter {
 		const productName = this.cleanProductDescription(rawProductName);
 
 		// new variable for quotation amount needed, its just the Total tax + Shipping amount + Line: Amount
-		const quotationAmount = (parseFloat(firstOrder['Total tax']) + parseFloat(firstOrder['Shipping amount']) + parseFloat(firstOrder['Line: Amount'])).toFixed(2).toString();
+		// just line amount actually
+		let quotationAmount = firstOrder['Line: Amount'] ? 
+		  parseFloat(firstOrder['Line: Amount']).toFixed(2).toString() : 
+		  '0.00';
 		
 		// Map main order to Monarch job format (with blank sub_job_id)
 		mainJobs.push({
@@ -266,6 +269,12 @@ class MonarchImporter {
 			
 			const orderRawProductName = order['Line: Product Name'] || '';
 			const orderProductName = this.cleanProductDescription(orderRawProductName);
+
+			// do the quotation amount again
+			//just the line amount actually
+			let quotationAmount = order['Line: Amount'] ? 
+			  parseFloat(order['Line: Amount']).toFixed(2).toString() : 
+			  '0.00';
 			
 			// Map sub-job to Monarch format
 			subJobs.push({
