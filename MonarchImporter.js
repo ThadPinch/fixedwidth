@@ -157,9 +157,8 @@ class MonarchImporter {
 	
 	/**
 	 * Map CSV data to Monarch jobs format with proper field extraction
-	 * For single line orders, no sub_job_id is assigned
-	 * For multi-line orders with the same job_id, numbered sub_job_ids are assigned
-	 * @returns {Array} Array of job objects in Monarch format
+	 * Separates main orders and sub-jobs into different arrays
+	 * @returns {Object} Object containing mainJobs and subJobs arrays in Monarch format
 	 */
 	mapOrdersToMonarch() {
 	  // First, group orders by invoice number
@@ -173,87 +172,131 @@ class MonarchImporter {
 		ordersByInvoice[invoiceNumber].push(order);
 	  });
 	  
-	  // Process each group and create job records with sub_job_ids only for multi-line orders
-	  const jobs = [];
+	  // Process each group and create job records, separating main jobs and sub-jobs
+	  const mainJobs = [];
+	  const subJobs = [];
 	  
 	  Object.entries(ordersByInvoice).forEach(([invoiceNumber, orders]) => {
-		// Determine if this is a multi-line job
-		const isMultiLine = orders.length > 1;
+		if (orders.length === 0) return;
 		
-		orders.forEach((order, index) => {
-		  // Create a job ID from the invoice number
-		  let jobId = '';
-		  jobId = invoiceNumber.toString().padEnd(8, ' ').substring(0, 8);
+		// Create a job ID from the invoice number
+		let jobId = '';
+		jobId = invoiceNumber.toString().padEnd(8, ' ').substring(0, 8);
 		  
-		  // Clean up jobId by replacing leading zeros with spaces
-		  jobId = jobId.replace(/^0+/, match => ' '.repeat(match.length));
-		  
-		  // Create sub_job_id based on whether this is a multi-line job
-		  let subJobId = '    '; // Default to 4 spaces (blank)
-		  
-		  if (isMultiLine) {
-			// Only assign numbers for multi-line jobs - 1-based indexing
-			subJobId = (index + 1).toString().padEnd(4, ' ').substring(0, 4);
-		  }
-		  
-		  // Parse dates from order data
-		  const dueDate = order['Due date'] ? this.formatDate(new Date(order['Due date'])) : '';
-		  const shipDate = order['Shipping date'] ? this.formatDate(new Date(order['Shipping date'])) : '';
-		  
-		  // Map the PO number from custom field
-		  const poNumber = order['Custom Field 1-po#'] || '';
-		  
-		  // Get the customer data that matches this order
-		  const customerRecord = this.customerData.find(c => c['Customer ID'] === order['Customer Name']);
-		  const customerId = customerRecord ? customerRecord['Customer ID'] : '';
-		  
-		  // Contact name from customer record
-		  const contactName = customerRecord ? 
-			`${customerRecord['Bill to Contact First Name'] || ''} ${customerRecord['Bill to Contact Last Name'] || ''}`.trim() : 
-			'';
-		  
-		  // Format numeric values
-		  const qtyOrdered = order['Line: Quantity'] ? 
-			parseFloat(order['Line: Quantity']).toFixed(0).toString() : 
-			'0.00';
-		  
-		  const unitPrice = order['Line: Unit price'] ? 
-			parseFloat(order['Line: Unit price']).toFixed(2).toString() : 
-			'0.00';
-		  
-		  // Clean product description
-		  const rawProductName = order['Line: Product Name'] || '';
-		  const productName = this.cleanProductDescription(rawProductName);
-		  
-		  // Map order to Monarch job format
-		  jobs.push({
-			'job_id': { value: jobId, pos: 1, len: 8 },
-			'sub_job_id': { value: subJobId, pos: 9, len: 4 },
-			'job_description': { value: productName.substring(0, 254), pos: 13, len: 254 },
-			'job_type': { value: 'Production', pos: 267, len: 19 }, // Default to Finished Goods
-			'item_id': { value: '', pos: 286, len: 15 },
-			'cust_ordered_by': { value: customerId.substring(0, 8), pos: 301, len: 8 },
-			'cust_billed_to': { value: customerId.substring(0, 8), pos: 309, len: 8 },
-			'sales_class_id': { value: '113', pos: 317, len: 8 },
-			'po_number': { value: poNumber.substring(0, 20), pos: 325, len: 20 },
-			'date_promised': { value: dueDate, pos: 345, len: 10 },
-			'ship_date': { value: shipDate, pos: 355, len: 10 },
-			'qty_ordered': { value: qtyOrdered, pos: 365, len: 11 },
-			'priority': { value: '', pos: 376, len: 10 }, 
-			'contact_name': { value: contactName.substring(0, 30), pos: 386, len: 30 },
-			'expense_code': { value: '', pos: 416, len: 24 },
-			'shop_floor_active': { value: '0', pos: 440, len: 1 },
-			'form_number': { value: '', pos: 441, len: 20 },
-			'quotation_amount': { value: '', pos: 461, len: 15 },
-			'unit_of_measure_id': { value: 'Each', pos: 476, len: 4 }, // Default to Each
-			'unit_price': { value: unitPrice, pos: 480, len: 16 },
-			'job_title': { value: productName.substring(0, 50), pos: 496, len: 50 },
-			'forest_type_id': { value: '', pos: 546, len: 15 },
-		  });
+		// Clean up jobId by replacing leading zeros with spaces
+		jobId = jobId.replace(/^0+/, match => ' '.repeat(match.length));
+		
+		// Process the first order as the main job (always has blank sub_job_id)
+		const firstOrder = orders[0];
+		
+		// Parse dates from order data
+		const dueDate = firstOrder['Due date'] ? this.formatDate(new Date(firstOrder['Due date'])) : '';
+		const shipDate = firstOrder['Shipping date'] ? this.formatDate(new Date(firstOrder['Shipping date'])) : '';
+		
+		// Map the PO number from custom field
+		const poNumber = firstOrder['Custom Field 1-po#'] || '';
+		
+		// Get the customer data that matches this order
+		const customerRecord = this.customerData.find(c => c['Customer ID'] === firstOrder['Customer Name']);
+		const customerId = customerRecord ? customerRecord['Customer ID'] : '';
+		
+		// Contact name from customer record
+		const contactName = customerRecord ? 
+		  `${customerRecord['Bill to Contact First Name'] || ''} ${customerRecord['Bill to Contact Last Name'] || ''}`.trim() : 
+		  '';
+		
+		// Format numeric values
+		const qtyOrdered = firstOrder['Line: Quantity'] ? 
+		  parseFloat(firstOrder['Line: Quantity']).toFixed(0).toString() : 
+		  '0';
+		
+		const unitPrice = firstOrder['Line: Unit price'] ? 
+		  parseFloat(firstOrder['Line: Unit price']).toFixed(2).toString() : 
+		  '0.00';
+		
+		// Clean product description
+		const rawProductName = firstOrder['Line: Product Name'] || '';
+		const productName = this.cleanProductDescription(rawProductName);
+
+		// new variable for quotation amount needed, its just the Total tax + Shipping amount + Line: Amount
+		const quotationAmount = (parseFloat(firstOrder['Total tax']) + parseFloat(firstOrder['Shipping amount']) + parseFloat(firstOrder['Line: Amount'])).toFixed(2).toString();
+		
+		// Map main order to Monarch job format (with blank sub_job_id)
+		mainJobs.push({
+		  'job_id': { value: jobId, pos: 1, len: 8 },
+		  'sub_job_id': { value: '    ', pos: 9, len: 4 }, // Always blank for main job
+		  'job_description': { value: productName.substring(0, 254), pos: 13, len: 254 },
+		  'job_type': { value: 'Production', pos: 267, len: 19 }, // Default to Finished Goods
+		  'item_id': { value: '', pos: 286, len: 15 },
+		  'cust_ordered_by': { value: customerId.substring(0, 8), pos: 301, len: 8 },
+		  'cust_billed_to': { value: customerId.substring(0, 8), pos: 309, len: 8 },
+		  'sales_class_id': { value: '113', pos: 317, len: 8 },
+		  'po_number': { value: poNumber.substring(0, 20), pos: 325, len: 20 },
+		  'date_promised': { value: dueDate, pos: 345, len: 10 },
+		  'ship_date': { value: shipDate, pos: 355, len: 10 },
+		  'qty_ordered': { value: qtyOrdered, pos: 365, len: 11 },
+		  'priority': { value: '', pos: 376, len: 10 }, 
+		  'contact_name': { value: contactName.substring(0, 30), pos: 386, len: 30 },
+		  'expense_code': { value: '', pos: 416, len: 24 },
+		  'shop_floor_active': { value: '0', pos: 440, len: 1 },
+		  'form_number': { value: '', pos: 441, len: 20 },
+		  'quotation_amount': { value: quotationAmount, pos: 461, len: 15 },
+		  'unit_of_measure_id': { value: 'Each', pos: 476, len: 4 }, // Default to Each
+		  'unit_price': { value: unitPrice, pos: 480, len: 16 },
+		  'job_title': { value: productName.substring(0, 50), pos: 496, len: 50 },
+		  'forest_type_id': { value: '', pos: 546, len: 15 },
 		});
+		
+		// Process additional order lines as sub-jobs with numbered sub_job_id
+		if (orders.length > 1) {
+		  // Start from index 1 (skip the first order that was already processed as main job)
+		  for (let i = 1; i < orders.length; i++) {
+			const order = orders[i];
+			
+			// Format sub-job-specific values
+			const subJobId = i.toString().padEnd(4, ' ').substring(0, 4);
+			
+			const orderQty = order['Line: Quantity'] ? 
+			  parseFloat(order['Line: Quantity']).toFixed(0).toString() : 
+			  '0';
+			
+			const orderUnitPrice = order['Line: Unit price'] ? 
+			  parseFloat(order['Line: Unit price']).toFixed(2).toString() : 
+			  '0.00';
+			
+			const orderRawProductName = order['Line: Product Name'] || '';
+			const orderProductName = this.cleanProductDescription(orderRawProductName);
+			
+			// Map sub-job to Monarch format
+			subJobs.push({
+			  'job_id': { value: jobId, pos: 1, len: 8 },
+			  'sub_job_id': { value: subJobId, pos: 9, len: 4 }, // Numbered for sub-jobs
+			  'job_description': { value: orderProductName.substring(0, 254), pos: 13, len: 254 },
+			  'job_type': { value: 'Production', pos: 267, len: 19 },
+			  'item_id': { value: '', pos: 286, len: 15 },
+			  'cust_ordered_by': { value: customerId.substring(0, 8), pos: 301, len: 8 },
+			  'cust_billed_to': { value: customerId.substring(0, 8), pos: 309, len: 8 },
+			  'sales_class_id': { value: '113', pos: 317, len: 8 },
+			  'po_number': { value: poNumber.substring(0, 20), pos: 325, len: 20 },
+			  'date_promised': { value: dueDate, pos: 345, len: 10 },
+			  'ship_date': { value: shipDate, pos: 355, len: 10 },
+			  'qty_ordered': { value: orderQty, pos: 365, len: 11 },
+			  'priority': { value: '', pos: 376, len: 10 }, 
+			  'contact_name': { value: contactName.substring(0, 30), pos: 386, len: 30 },
+			  'expense_code': { value: '', pos: 416, len: 24 },
+			  'shop_floor_active': { value: '0', pos: 440, len: 1 },
+			  'form_number': { value: '', pos: 441, len: 20 },
+			  'quotation_amount': { value: quotationAmount, pos: 461, len: 15 },
+			  'unit_of_measure_id': { value: 'Each', pos: 476, len: 4 },
+			  'unit_price': { value: orderUnitPrice, pos: 480, len: 16 },
+			  'job_title': { value: orderProductName.substring(0, 50), pos: 496, len: 50 },
+			  'forest_type_id': { value: '', pos: 546, len: 15 },
+			});
+		  }
+		}
 	  });
 	  
-	  return jobs;
+	  return { mainJobs, subJobs };
 	}
 	  
 	/**
@@ -276,13 +319,13 @@ class MonarchImporter {
 		return `${month}/${day}/${year}`;
 	  }
 	}
-	  
+	
 	/**
-	 * Generate fixed-width job import file
+	 * Generate a fixed-width text file from job array
+	 * @param {Array} jobs - Array of job objects
 	 * @returns {string} Fixed-width text file content
 	 */
-	generateJobImportFile() {
-	  const jobs = this.mapOrdersToMonarch();
+	generateFixedWidthFile(jobs) {
 	  let result = '';
 	  
 	  jobs.forEach(job => {
@@ -310,6 +353,22 @@ class MonarchImporter {
 	  });
 	  
 	  return result;
+	}
+	  
+	/**
+	 * Generate two separate job import files - one for main jobs and one for sub-jobs
+	 * @returns {Object} Object containing mainJobsFile and subJobsFile content
+	 */
+	generateJobImportFiles() {
+	  const { mainJobs, subJobs } = this.mapOrdersToMonarch();
+	  
+	  // Generate main jobs file (with blank sub_job_id)
+	  const mainJobsFile = this.generateFixedWidthFile(mainJobs);
+	  
+	  // Generate sub-jobs file (with numbered sub_job_id)
+	  const subJobsFile = this.generateFixedWidthFile(subJobs);
+	  
+	  return { mainJobsFile, subJobsFile };
 	}
 	  
 	/**
@@ -355,18 +414,20 @@ class MonarchImporter {
 		
 		await Promise.all(promises);
 		
-		// Generate job import file
-		const jobImport = this.generateJobImportFile();
+		// Generate job import files
+		const { mainJobsFile, subJobsFile } = this.generateJobImportFiles();
 		
-		// Download the job file
-		this.downloadTextFile(jobImport, 'monarch_job_import.txt');
+		// Download the job files
+		this.downloadTextFile(mainJobsFile, 'monarch_main_jobs.txt');
+		this.downloadTextFile(subJobsFile, 'monarch_sub_jobs.txt');
 		
-		// Store in localStorage for the viewer
-		localStorage.setItem('monarch_job_import', jobImport);
+		// Store in localStorage for the viewer (combine both for backwards compatibility)
+		const combinedFile = mainJobsFile + subJobsFile;
+		localStorage.setItem('monarch_job_import', combinedFile);
 		
 		return {
 		  success: true,
-		  message: 'Monarch job import file generated successfully!'
+		  message: 'Monarch job import files generated successfully!'
 		};
 	  } catch (error) {
 		console.error('Error processing files:', error);

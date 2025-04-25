@@ -40,6 +40,7 @@ class CustomerListImporter {
 			  // Skip directories
 			  if (zip.files[filename].dir) return;
 			  
+			  
 			  // Process CSV files
 			  if (filename.toLowerCase().endsWith('.csv')) {
 				const filePromise = zip.files[filename].async('string').then(content => {
@@ -141,6 +142,18 @@ class CustomerListImporter {
 	}
 	
 	/**
+	 * Format a phone number to a consistent format by removing all non-digit characters
+	 * @param {string} phone - The phone number to format
+	 * @returns {string} Formatted phone number
+	 */
+	formatPhoneNumber(phone) {
+	  if (!phone) return '';
+	  
+	  // Remove all non-digit characters (spaces, parentheses, dashes, periods)
+	  return phone.toString().replace(/\D/g, '');
+	}
+	
+	/**
 	 * Get user email by userID
 	 * @param {number|string} userID - The userID to look up
 	 * @returns {string} Email address or empty string if not found
@@ -200,9 +213,12 @@ class CustomerListImporter {
 		  const zip = (customer.btZip || customer.zip || customer.Zip || '').toString().substring(0, 10);
 		  const country = (customer.btCountry || customer.country || customer.Country || 'USA').toString().substring(0, 40);
 		  
-		  // Contact information
-		  const phone = (customer.btTelephone || customer.phone || customer.Phone || '').toString().substring(0, 20);
-		  const fax = (customer.btFax || customer.fax || customer.Fax || '').toString().substring(0, 20);
+		  // Contact information - Apply consistent phone formatting
+		  const rawPhone = (customer.btTelephone || customer.phone || customer.Phone || '').toString();
+		  const phone = this.formatPhoneNumber(rawPhone).substring(0, 20);
+		  
+		  const rawFax = (customer.btFax || customer.fax || customer.Fax || '').toString();
+		  const fax = this.formatPhoneNumber(rawFax).substring(0, 20);
 		  
 		  // Get email from user list based on billContactUserID
 		  let email = '';
@@ -234,7 +250,11 @@ class CustomerListImporter {
 		  // do some terms filtering here to maek it so it is their new  values.
 		  // 1=taxable, 3=non taxable
 		//   const arTaxCode = (customer.isTaxable === 'Y' ? 'Taxable' : 'NonTaxable');
-		const arTaxCode = (customer.isTaxable === 'Y' ? '1' : '3');
+		let arTaxCode = (customer.isTaxable === 'Y' ? '1' : '3');
+		// then if the state isn't 'AZ' then set it to '3'
+		if (state !== 'AZ' && state !== '') {
+			arTaxCode = '3';
+		}
 		  
 		  // do some terms filtering here to maek it so it is their new  values.
 		//   const termsCode = (customer.btTerms || '').toString().substring(0, 20);
@@ -533,4 +553,4 @@ class CustomerListImporter {
 		};
 	  }
 	}
-  }
+}
