@@ -268,7 +268,7 @@ class CustomerListImporter {
 		  // do some terms filtering here to maek it so it is their new  values.
 		  // 1=taxable, 3=non taxable
 		//   const arTaxCode = (customer.isTaxable === 'Y' ? 'Taxable' : 'NonTaxable');
-		let arTaxCode = (customer.isTaxable === 'Y' ? '1' : '3');
+		let arTaxCode = (customer.isTaxable === 'Y' ? '1-4' : '3');
 		// then if the state isn't 'AZ' then set it to '3'
 		if (state !== 'AZ' && state !== '') {
 			arTaxCode = '3';
