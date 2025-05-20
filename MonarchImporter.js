@@ -519,7 +519,7 @@ try {
 		URL.revokeObjectURL(url);
 	  }, 0);
 	}
-  
+	
 	/**
 	 * Process all files and generate Monarch import files
 	 * @param {Object} files - Object containing File objects for customer, order, and payment CSV files
@@ -544,14 +544,32 @@ try {
 		// Generate job import files - note this is now async
 		const { mainJobsFile, subJobsFile, rejectionFile } = await this.generateJobImportFiles();
 		
-		// Download the job files
-		this.downloadTextFile(mainJobsFile, 'monarch_main_jobs.txt');
-		this.downloadTextFile(subJobsFile, 'monarch_sub_jobs.txt');
+		// Create a zip file containing all the generated files
+		const zip = new JSZip();
+		zip.file("monarch_main_jobs.txt", mainJobsFile);
+		zip.file("monarch_sub_jobs.txt", subJobsFile);
 		
-		// Download rejection file if there are any rejected orders
+		// Add rejection file if there are any rejected orders
 		if (this.rejectedOrders.length > 0) {
-		  this.downloadTextFile(rejectionFile, 'monarch_rejected_orders.txt');
+		  zip.file("monarch_rejected_orders.txt", rejectionFile);
 		}
+		
+		// Generate the zip file
+		const zipContent = await zip.generateAsync({ type: "blob" });
+		
+		// Download the zip file
+		const url = URL.createObjectURL(zipContent);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = 'monarch_import_files.zip';
+		document.body.appendChild(a);
+		a.click();
+		
+		// Clean up
+		setTimeout(() => {
+		  document.body.removeChild(a);
+		  URL.revokeObjectURL(url);
+		}, 0);
 		
 		// Store in localStorage for the viewer (combine both for backwards compatibility)
 		const combinedFile = mainJobsFile + subJobsFile;
