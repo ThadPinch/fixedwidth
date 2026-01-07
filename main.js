@@ -28,6 +28,11 @@ document.addEventListener('DOMContentLoaded', function() {
   const paymentFileInput = document.getElementById('payment-file');
   const generateJobBtn = document.getElementById('generate-job-btn');
   
+  // WIP Import Elements
+  const wipDropzone = document.getElementById('wip-dropzone');
+  const wipFileInput = document.getElementById('wip-file');
+  const generateWipBtn = document.getElementById('generate-wip-btn');
+
   // Customer Import Elements
   const customerListDropzone = document.getElementById('customer-list-dropzone');
   const customerListFileInput = document.getElementById('customer-list-file');
@@ -47,10 +52,14 @@ customerListFileInput.setAttribute('accept', '.zip');
   
   // Store customer list file
   let customerListFile = null;
-  
+
+  // Store WIP file
+  let wipFile = null;
+
   // Create importer instances
   const monarchImporter = new MonarchImporter();
   const customerListImporter = new CustomerListImporter();
+  const wipImporter = new WIPImporter();
   
   // Initialize the file viewer
   const fileViewer = new MonarchFileViewer();
@@ -97,7 +106,7 @@ customerListFileInput.setAttribute('accept', '.zip');
   function updateCustomerListStatus(isFound) {
     const statusElement = document.getElementById('customer-list-status');
     const textElement = document.getElementById('customer-list-text');
-    
+
     if (isFound) {
       statusElement.className = 'status-indicator status-found';
       textElement.textContent = 'Found';
@@ -106,6 +115,25 @@ customerListFileInput.setAttribute('accept', '.zip');
       statusElement.className = 'status-indicator status-missing';
       textElement.textContent = 'Not found';
       generateCustomerBtn.disabled = true;
+    }
+  }
+
+  /**
+   * Update WIP file status
+   * @param {boolean} isFound - Whether the file is found
+   */
+  function updateWipStatus(isFound) {
+    const statusElement = document.getElementById('wip-status');
+    const textElement = document.getElementById('wip-text');
+
+    if (isFound) {
+      statusElement.className = 'status-indicator status-found';
+      textElement.textContent = 'Found';
+      generateWipBtn.disabled = false;
+    } else {
+      statusElement.className = 'status-indicator status-missing';
+      textElement.textContent = 'Not found';
+      generateWipBtn.disabled = true;
     }
   }
   
@@ -365,9 +393,92 @@ generateJobBtn.addEventListener('click', async () => {
     logMessage('No customer ZIP file selected.', 'error');
     return;
   }
-  
+
   logMessage('Generating Monarch customer import file...');
   processCustomerFile();
+});
+
+// WIP Import handlers
+wipDropzone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  wipDropzone.classList.add('highlight');
+});
+
+wipDropzone.addEventListener('dragleave', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  wipDropzone.classList.remove('highlight');
+});
+
+wipDropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  wipDropzone.classList.remove('highlight');
+
+  const droppedFiles = e.dataTransfer.files;
+  if (droppedFiles.length > 0) {
+    const file = droppedFiles[0];
+    if (file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) {
+      wipFile = file;
+      updateWipStatus(true);
+      logMessage(`WIP file selected: ${file.name}`);
+    } else {
+      logMessage('Please drop an XLS or XLSX file.', 'error');
+    }
+  }
+});
+
+wipDropzone.addEventListener('click', () => {
+  wipFileInput.click();
+});
+
+wipFileInput.addEventListener('change', (e) => {
+  if (e.target.files.length > 0) {
+    const file = e.target.files[0];
+    if (file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) {
+      wipFile = file;
+      updateWipStatus(true);
+      logMessage(`WIP file selected: ${file.name}`);
+    } else {
+      logMessage('Please select an XLS or XLSX file.', 'error');
+      updateWipStatus(false);
+    }
+  }
+});
+
+/**
+ * Process WIP file
+ */
+function processWipFile() {
+  if (wipFile) {
+    logMessage('Processing WIP file...');
+
+    wipImporter.processFile(wipFile)
+      .then(result => {
+        if (result.success) {
+          logMessage(result.message, 'success');
+          fileViewer.loadFile('wip');
+        } else {
+          logMessage(result.message, 'error');
+        }
+      })
+      .catch(error => {
+        logMessage(`Error: ${error.message}`, 'error');
+      });
+  } else {
+    logMessage('No WIP file selected.', 'error');
+  }
+}
+
+generateWipBtn.addEventListener('click', () => {
+  if (!wipFile) {
+    logMessage('No WIP file selected.', 'error');
+    return;
+  }
+
+  logMessage('Generating WIP import file...');
+  processWipFile();
 });
 
 logMessage('Ready to process files. Upload ZIP or individual CSV files to begin.');

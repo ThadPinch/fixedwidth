@@ -105,6 +105,7 @@ class MonarchFileViewer {
 		<h2>File Viewer</h2>
 		<div class="file-selector">
 		  <button id="view-job-btn" class="viewer-btn">View Job File</button>
+		  <button id="view-wip-btn" class="viewer-btn">View WIP File</button>
 		  <button id="view-customer-btn" class="viewer-btn">View Customer File</button>
 		  <div id="file-position-display" class="position-display">Position: <span id="current-position">0</span></div>
 		</div>
@@ -119,30 +120,49 @@ class MonarchFileViewer {
 	  document.getElementById('view-customer-btn').addEventListener('click', () => {
 		this.loadFile('customer');
 	  });
-	  
+
 	  document.getElementById('view-job-btn').addEventListener('click', () => {
 		this.loadFile('job');
+	  });
+
+	  document.getElementById('view-wip-btn').addEventListener('click', () => {
+		this.loadFile('wip');
 	  });
 	}
   
 	/**
 	 * Load a file into the viewer
-	 * @param {string} fileType - Type of file ('customer' or 'job')
+	 * @param {string} fileType - Type of file ('customer', 'job', or 'wip')
 	 */
 	loadFile(fileType) {
 	  this.currentFileType = fileType;
-	  
-	  // Get file content from localStorage where the MonarchImporter stored it
-	  const fileKey = fileType === 'customer' ? 'monarch_customer_import' : 'monarch_job_import';
+
+	  // Get file content from localStorage where the importers stored it
+	  let fileKey;
+	  if (fileType === 'customer') {
+		fileKey = 'monarch_customer_import';
+	  } else if (fileType === 'job') {
+		fileKey = 'monarch_job_import';
+	  } else if (fileType === 'wip') {
+		fileKey = 'wipImportData';
+	  }
+
 	  this.currentFileContent = localStorage.getItem(fileKey);
-	  
+
 	  // If there's no file content yet, show a placeholder
 	  if (!this.currentFileContent) {
 		// Use sample data for demonstration
 		this.currentFileContent = this.getSampleData(fileType);
 	  }
-	  
-	  this.  displayFile();
+
+	  // WIP uses the same format as job, so use job field definitions
+	  if (fileType === 'wip') {
+		this.displayFileType = 'job';
+	  } else {
+		this.displayFileType = fileType;
+	  }
+
+	  this.displayFile();
 	}
 	
 	/**
@@ -178,15 +198,18 @@ class MonarchFileViewer {
 	 */
 	displayFile() {
 	  if (!this.currentFileContent || !this.currentFileType) {
-		document.getElementById('viewer-content').innerHTML = 
+		document.getElementById('viewer-content').innerHTML =
 		  '<div class="empty-message">No file loaded. Generate files first or select a file type.</div>';
 		document.getElementById('field-key').innerHTML = '';
 		return;
 	  }
-	  
+
 	  const viewerContent = document.getElementById('viewer-content');
 	  const fieldKey = document.getElementById('field-key');
-	  const fields = this.fieldDefinitions[this.currentFileType];
+
+	  // Use displayFileType for field definitions (WIP uses job format)
+	  const fileTypeForFields = this.displayFileType || this.currentFileType;
+	  const fields = this.fieldDefinitions[fileTypeForFields];
 	  
 	  // Split the file content into lines
 	  const lines = this.currentFileContent.split('\n');
@@ -235,6 +258,13 @@ class MonarchFileViewer {
 	  // Add the field key with sorting
 	  let keyHtml = '';
 	  
+	  // Add download button for WIP files
+	  if (this.currentFileType === 'wip') {
+		keyHtml += `<div class="download-section" style="margin-bottom: 15px;">
+		  <button id="download-wip-btn" class="viewer-btn">Download WIP Import File</button>
+		</div>`;
+	  }
+	  
 	  // Sort fields by position
 	  const sortedFields = [...fields].sort((a, b) => a.pos - b.pos);
 	  
@@ -250,10 +280,72 @@ class MonarchFileViewer {
 	  
 	  fieldKey.innerHTML = keyHtml;
 	  
+	  // Add click handler for WIP download button
+	  if (this.currentFileType === 'wip') {
+		const downloadBtn = document.getElementById('download-wip-btn');
+		if (downloadBtn) {
+		  downloadBtn.addEventListener('click', () => {
+			const blob = new Blob([this.currentFileContent], { type: 'text/plain' });
+			const url = window.URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `WIP_Import_${new Date().toISOString().split('T')[0]}.txt`;
+			document.body.appendChild(a);
+			a.click();
+			window.URL.revokeObjectURL(url);
+			document.body.removeChild(a);
+		  });
+		}
+	  }
+	  
 	  // Set up mousemove to show current position
 	  viewerContent.addEventListener('mousemove', this.trackMousePosition.bind(this));
 	}
-  
+
+	/**
+	 * Display plain text file (for WIP imports)
+	 */
+	displayPlainTextFile() {
+	  const viewerContent = document.getElementById('viewer-content');
+	  const fieldKey = document.getElementById('field-key');
+
+	  // Clear the field key
+	  fieldKey.innerHTML = '';
+
+	  // Split the file content into lines
+	  const lines = this.currentFileContent.split('\n');
+
+	  let html = '<div class="plain-text-wrapper" style="padding: 20px; font-family: monospace; white-space: pre-wrap;">';
+
+	  lines.forEach((line, lineIndex) => {
+		html += `<div class="line"><span class="line-number">${lineIndex + 1}</span>${line}</div>`;
+	  });
+
+	  html += '</div>';
+
+	  // Display the content
+	  viewerContent.innerHTML = html;
+
+	  // Add download button
+	  const downloadBtn = document.createElement('button');
+	  downloadBtn.textContent = 'Download WIP File';
+	  downloadBtn.className = 'viewer-btn';
+	  downloadBtn.style.marginTop = '10px';
+	  downloadBtn.addEventListener('click', () => {
+		const blob = new Blob([this.currentFileContent], { type: 'text/plain' });
+		const url = window.URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `WIP_Import_${new Date().toISOString().split('T')[0]}.txt`;
+		document.body.appendChild(a);
+		a.click();
+		window.URL.revokeObjectURL(url);
+		document.body.removeChild(a);
+	  });
+
+	  fieldKey.appendChild(downloadBtn);
+	}
+
 	/**
 	 * Track mouse position to show the current character position
 	 * @param {MouseEvent} event - Mouse event
@@ -278,9 +370,10 @@ class MonarchFileViewer {
 	  // Update the position display
 	  document.getElementById('current-position').textContent = position;
 	  
-	  // Find which field this position belongs to
-	  if (this.currentFileType) {
-		const fields = this.fieldDefinitions[this.currentFileType];
+	  // Find which field this position belongs to (use displayFileType for WIP)
+	  const fileTypeForFields = this.displayFileType || this.currentFileType;
+	  if (fileTypeForFields && this.fieldDefinitions[fileTypeForFields]) {
+		const fields = this.fieldDefinitions[fileTypeForFields];
 		const field = fields.find(f => position >= f.pos && position < f.pos + f.len);
 		
 		// Update the display with field information if found

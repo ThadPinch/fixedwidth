@@ -5,6 +5,7 @@
   <title>Monarch Import Generator</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <link rel="stylesheet" href="styles.css">
   <!-- Use regular scripts instead of modules -->
 
@@ -12,6 +13,7 @@
   <script src="MonarchFileViewer.js"></script>
   <script src="CustomerListImporter.js"></script>
   <script src="MonarchImporter.js"></script>
+  <script src="WIPImporter.js"></script>
   <script src="main.js"></script>
 </head>
 <body>
@@ -20,6 +22,7 @@
     
     <div class="tabs">
       <button class="tab-btn active" data-tab="job-tab">Job Import</button>
+      <button class="tab-btn" data-tab="wip-tab">WIP Import</button>
       <button class="tab-btn" data-tab="customer-tab">Customer Import</button>
     </div>
     
@@ -79,7 +82,32 @@
       
       <button id="generate-job-btn" disabled>Generate Job Import File</button>
     </div>
-    
+
+    <div id="wip-tab" class="tab-content">
+      <div class="file-upload">
+        <h3>Upload XLS File</h3>
+        <div>
+          <ol>
+            <li>Upload XLS File</li>
+            <li>Click "Generate WIP Import File"</li>
+            <li>Click "View WIP File"</li>
+          </ol>
+        </div>
+        <div id="wip-dropzone" class="dropzone">
+          <p>Drag & drop your XLS file here or click to browse</p>
+          <input type="file" id="wip-file" accept=".xls,.xlsx" style="display: none">
+        </div>
+      </div>
+
+      <div class="file-status">
+        <div id="wip-status" class="status-indicator status-missing"></div>
+        <span>WIP File: </span>
+        <span id="wip-text">Not found</span>
+      </div>
+
+      <button id="generate-wip-btn" disabled>Generate WIP Import File</button>
+    </div>
+
     <div id="customer-tab" class="tab-content">
       <div class="file-upload">
         <div>
