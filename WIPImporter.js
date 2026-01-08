@@ -414,6 +414,35 @@ class WIPImporter {
       // Calculate successful records (filtered minus rejected)
       const successfulRecords = filterResult.validCount - this.rejectedOrders.length;
 
+      // Generate rejection file
+      const rejectionFile = this.generateRejectionFile();
+
+      // Create a zip file containing all the generated files
+      const zip = new JSZip();
+      zip.file("wip_import.txt", wipImportData);
+      
+      // Add rejection file if there are any rejected orders
+      if (this.rejectedOrders.length > 0) {
+        zip.file("wip_rejected_orders.csv", rejectionFile);
+      }
+
+      // Generate the zip file and download
+      const zipContent = await zip.generateAsync({ type: "blob" });
+      
+      // Download the zip file
+      const url = URL.createObjectURL(zipContent);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `wip_import_files_${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 0);
+
       // Build result message
       let message = `WIP import file generated successfully with ${successfulRecords} records`;
       if (filterResult.skippedCount > 0) {
