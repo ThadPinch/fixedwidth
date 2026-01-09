@@ -244,8 +244,8 @@ class WIPImporter {
       const dueDate = this.formatDate(this.findColumn(row, dueDateColumns));
       const orderValue = this.formatCurrency(this.findColumn(row, orderValueColumns));
 
-      // Format job_id - add N prefix and pad to 8 chars
-      const jobId = ('N' + orderId).padEnd(8, ' ').substring(0, 8);
+      // Format job_id - pad to 8 chars (no N prefix per feedback)
+      const jobId = orderId.padEnd(8, ' ').substring(0, 8);
 
       // Look up customer ID via API
       let monarchCustomerId = '';
@@ -306,7 +306,7 @@ class WIPImporter {
         'sales_class_id': { value: '113', pos: 317, len: 8 },
         'po_number': { value: '', pos: 325, len: 20 },
         'date_promised': { value: dueDate, pos: 345, len: 10 },
-        'ship_date': { value: '', pos: 355, len: 10 },
+        'ship_date': { value: dueDate, pos: 355, len: 10 },
         'qty_ordered': { value: '1', pos: 365, len: 11 },
         'priority': { value: '', pos: 376, len: 10 },
         'contact_name': { value: '', pos: 386, len: 30 },
