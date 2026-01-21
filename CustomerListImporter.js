@@ -251,7 +251,9 @@ class CustomerListImporter {
 		  let people = {
 			"hyland": [35],
 			"pinch": [0, 2, 32, 5, 6, 37, 40, 42, 44],
-			"lawhon": [48]
+			"lawhon": [48],
+			"lott": [78],
+			"bonds": [72],
 		  };
 		  
 		  // Function to get the salesman name based on salesmanID
